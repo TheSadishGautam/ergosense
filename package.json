@@ -21,7 +21,11 @@
     "ai",
     "posture"
   ],
-  "author": "ErgoSense Team",
+  "author": {
+    "name": "Sadish Gautam",
+    "email": "ergosense@sadish.com.np",
+    "url": "https://sadish.com.np"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
