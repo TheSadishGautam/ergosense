@@ -4,6 +4,7 @@ import { StatusHUD } from './components/StatusHUD';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
 import { Onboarding } from './components/Onboarding';
+import { UpdateBanner } from './components/UpdateBanner';
 import { LiveState } from '../../models/types';
 import logoIcon from './assets/icon.png';
 import './styles.css';
@@ -12,6 +13,7 @@ function App() {
   const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [view, setView] = useState<'LIVE' | 'DASHBOARD' | 'SETTINGS'>('LIVE');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,7 +37,15 @@ function App() {
       setLiveState(state);
     });
 
-    return cleanup;
+    // Listen for app updates
+    const cleanupUpdate = window.electronAPI.onUpdateAvailable(() => {
+      setShowUpdateBanner(true);
+    });
+
+    return () => {
+      cleanup();
+      cleanupUpdate();
+    };
   }, []);
 
   const handleOnboardingComplete = async () => {
@@ -68,6 +78,7 @@ function App() {
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0a0e17 0%, #1a1f2e 100%)',
     }}>
+      {showUpdateBanner && <UpdateBanner onDismiss={() => setShowUpdateBanner(false)} />}
       {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
       
       {/* Top Bar */}

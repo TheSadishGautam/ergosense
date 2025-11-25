@@ -13,6 +13,7 @@ interface ElectronAPI {
   setAutoStart: (enable: boolean) => Promise<boolean>;
   getAppSetting: (key: string) => Promise<any>;
   setAppSetting: (key: string, value: any) => Promise<boolean>;
+  onUpdateAvailable: (callback: (info: any) => void) => () => void;
 }
 
 declare global {

@@ -9,4 +9,6 @@ export const IPC_CHANNELS = {
   SET_AUTO_START: 'set-auto-start',
   GET_APP_SETTING: 'get-app-setting',
   SET_APP_SETTING: 'set-app-setting',
+  UPDATE_AVAILABLE: 'update-available',
+  UPDATE_DOWNLOADED: 'update-downloaded',
 } as const;

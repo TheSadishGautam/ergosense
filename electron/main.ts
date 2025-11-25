@@ -106,7 +106,24 @@ function createWindow() {
   });
 
   // Check for updates
-  autoUpdater.checkForUpdatesAndNotify();
+  // Check for updates
+  autoUpdater.checkForUpdates();
+
+  autoUpdater.on('update-available', (info) => {
+    win?.webContents.send(IPC_CHANNELS.UPDATE_AVAILABLE, info);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    win?.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info);
+  });
+
+  // Open external links in default browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:')) {
+      require('electron').shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);

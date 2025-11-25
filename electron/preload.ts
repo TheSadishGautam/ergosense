@@ -19,4 +19,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setAutoStart: (enable: boolean) => ipcRenderer.invoke(IPC_CHANNELS.SET_AUTO_START, enable),
   getAppSetting: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.GET_APP_SETTING, key),
   setAppSetting: (key: string, value: any) => ipcRenderer.invoke(IPC_CHANNELS.SET_APP_SETTING, key, value),
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    const subscription = (_event: any, value: any) => callback(value);
+    ipcRenderer.on(IPC_CHANNELS.UPDATE_AVAILABLE, subscription);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.UPDATE_AVAILABLE, subscription);
+    };
+  },
 });
