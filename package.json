@@ -1,0 +1,98 @@
+{
+  "name": "ergosense",
+  "version": "0.1.0",
+  "description": "A cross-platform desktop ergonomics assistant",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder",
+    "build:mac": "tsc && vite build && PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder --mac",
+    "build:win": "tsc && vite build && PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder --win",
+    "build:linux": "tsc && vite build && PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder --linux",
+    "build:all": "tsc && vite build && PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder --mac --win --linux",
+    "postinstall": "PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder install-app-deps",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "ergonomics",
+    "electron",
+    "react",
+    "ai",
+    "posture"
+  ],
+  "author": "ErgoSense Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vite-plugin-electron": "^0.15.4",
+    "vite-plugin-electron-renderer": "^0.14.5"
+  },
+  "build": {
+    "appId": "com.sadishgautam.ergosense",
+    "productName": "ErgoSense",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      "resources/**"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "identity": null,
+      "category": "public.app-category.healthcare-fitness"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TheSadishGautam",
+        "repo": "ergosense"
+      }
+    ]
+  },
+  "dependencies": {
+    "@sentry/electron": "^7.3.0",
+    "better-sqlite3": "^12.4.6",
+    "brightness": "^3.0.0",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
+    "onnxruntime-node": "^1.16.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^3.5.0"
+  }
+}

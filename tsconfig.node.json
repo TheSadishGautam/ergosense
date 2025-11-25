@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "target": "ESNext"
+  },
+  "include": ["vite.config.ts", "electron/**/*.ts", "models/**/*.ts"]
+}
