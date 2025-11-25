@@ -14,11 +14,17 @@ mac:
   icon: build/icon.png
   identity: null
   category: public.app-category.healthcare-fitness
+  files:
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32${/*}"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux${/*}"
 win:
   target:
     - nsis
     - portable
   icon: build/icon.png
+  files:
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin${/*}"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux${/*}"
 linux:
   target:
     - AppImage
@@ -26,6 +32,9 @@ linux:
     - rpm
   icon: build/icon.png
   category: Utility
+  files:
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin${/*}"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32${/*}"
 publish:
   provider: github
   owner: TheSadishGautam
