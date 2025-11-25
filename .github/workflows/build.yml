@@ -34,7 +34,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build & Release
+      - name: Rebuild native modules
+        run: npx electron-rebuild
+
+      - name: Build and Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PERSONAL_TOKEN }}
         run: npm run build
