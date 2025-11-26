@@ -15,16 +15,28 @@ mac:
   identity: null
   category: public.app-category.healthcare-fitness
   files:
-    - "!node_modules/onnxruntime-node/bin/napi-v6/win32${/*}"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/linux${/*}"
+    - "dist/**/*"
+    - "dist-electron/**/*"
+    - "node_modules/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
+    # Exclude x64 binaries if building for arm64 (and vice versa) - handled by electron-builder automatically for some, but let's be safe
+    # Actually, let's stick to platform exclusion first to be safe.
+    - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+    - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 win:
   target:
     - nsis
     - portable
   icon: build/icon.png
   files:
-    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin${/*}"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/linux${/*}"
+    - "dist/**/*"
+    - "dist-electron/**/*"
+    - "node_modules/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
+    - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+    - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 linux:
   target:
     - AppImage
@@ -33,8 +45,13 @@ linux:
   icon: build/icon.png
   category: Utility
   files:
-    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin${/*}"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/win32${/*}"
+    - "dist/**/*"
+    - "dist-electron/**/*"
+    - "node_modules/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+    - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+    - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 publish:
   provider: github
   owner: TheSadishGautam
