@@ -1,5 +1,7 @@
 appId: com.sadishgautam.ergosense
 productName: ErgoSense
+directories:
+  output: release
 files:
   - dist/**/*
   - dist-electron/**/*
@@ -17,11 +19,8 @@ mac:
   files:
     - "dist/**/*"
     - "dist-electron/**/*"
-    - "node_modules/**/*"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
-    # Exclude x64 binaries if building for arm64 (and vice versa) - handled by electron-builder automatically for some, but let's be safe
-    # Actually, let's stick to platform exclusion first to be safe.
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**"
     - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 win:
@@ -32,9 +31,8 @@ win:
   files:
     - "dist/**/*"
     - "dist-electron/**/*"
-    - "node_modules/**/*"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**"
     - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 linux:
@@ -47,9 +45,8 @@ linux:
   files:
     - "dist/**/*"
     - "dist-electron/**/*"
-    - "node_modules/**/*"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
-    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
     - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 publish:
