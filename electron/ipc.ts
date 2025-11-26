@@ -7,8 +7,13 @@ export const IPC_CHANNELS = {
   TEST_NOTIFICATION: 'test-notification',
   GET_AUTO_START: 'get-auto-start',
   SET_AUTO_START: 'set-auto-start',
+  GET_SYSTEM_STATS: 'get-system-stats',
   GET_APP_SETTING: 'get-app-setting',
   SET_APP_SETTING: 'set-app-setting',
   UPDATE_AVAILABLE: 'update-available',
   UPDATE_DOWNLOADED: 'update-downloaded',
+  START_CALIBRATION: 'start-calibration',
+  CALIBRATION_PROGRESS: 'calibration-progress',
+  GET_POSTURE_BASELINE: 'get-posture-baseline',
+  SET_POSTURE_BASELINE: 'set-posture-baseline',
 } as const;

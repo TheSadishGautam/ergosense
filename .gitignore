@@ -16,3 +16,4 @@ release
 *.njsproj
 *.sln
 *.sw?
+temp_asar_extract

@@ -2,6 +2,7 @@ import React from 'react';
 import { LiveState } from '../../../models/types';
 import { getPostureStatus, getEyeStatus, getBlinkStatus } from '../utils/statusHelpers';
 import { COLORS } from '../utils/theme';
+import { Moon, AlertTriangle, CheckCircle, Zap, Activity, Eye } from 'lucide-react';
 
 interface StatusHUDProps {
   state: LiveState | null;
@@ -31,8 +32,8 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
         background: 'var(--bg-secondary)',
         border: '1px solid var(--border-color)',
       }}>
-        <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)', opacity: 0.5 }}>
-          💤
+        <div style={{ marginBottom: 'var(--space-4)', opacity: 0.5, display: 'flex', justifyContent: 'center' }}>
+          <Moon size={48} />
         </div>
         <h3 style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>User Away</h3>
         <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
@@ -80,7 +81,7 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
           padding: 'var(--space-4)',
         }}>
           <div className="flex items-center gap-3">
-            <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+            <AlertTriangle size={24} className="text-danger" />
             <div>
               <div style={{ fontWeight: 600, color: 'var(--danger-light)', fontSize: '0.875rem' }}>
                 Attention Required
@@ -151,8 +152,12 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
               fontSize: '0.875rem',
               fontWeight: 600,
               color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'var(--space-1)',
             }}>
-              🧍 Posture
+              <Activity size={16} /> Posture
             </div>
             <div className="badge badge-success" style={{ 
               marginTop: 'var(--space-1)',
@@ -206,8 +211,12 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
               fontSize: '0.875rem',
               fontWeight: 600,
               color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'var(--space-1)',
             }}>
-              👁️ Eye Health
+              <Eye size={16} /> Eye Health
             </div>
             <div className="badge badge-info" style={{ 
               marginTop: 'var(--space-1)',
@@ -315,8 +324,11 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
               fontSize: '1.75rem', 
               fontWeight: 700,
               color: state.postureScore >= 0.7 && state.eyeStrainScore <= 0.3 ? '#10b981' : '#f59e0b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
             }}>
-              {state.postureScore >= 0.7 && state.eyeStrainScore <= 0.3 ? '✅' : '⚠️'}
+              {state.postureScore >= 0.7 && state.eyeStrainScore <= 0.3 ? <CheckCircle size={28} /> : <AlertTriangle size={28} />}
             </div>
             <div style={{ 
               fontSize: '0.75rem', 
@@ -337,7 +349,7 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
             border: '1px solid var(--info)',
           }}>
             <div className="flex items-center gap-2">
-              <span style={{ fontSize: '1.25rem' }}>💡</span>
+              <Zap size={20} className="text-info" />
               <div>
                 <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--info-light)' }}>
                   Tip: Blink more frequently

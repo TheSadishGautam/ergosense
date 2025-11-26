@@ -1,5 +1,7 @@
+import React from 'react';
 import { COLORS, GRADIENTS } from '../utils/theme';
 import { StatusLevel } from '../utils/statusHelpers';
+import { TrendingUp, TrendingDown, AlertTriangle, AlertOctagon } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
@@ -7,7 +9,7 @@ interface MetricCardProps {
   unit?: string;
   trend?: number;
   status?: StatusLevel;
-  icon?: string;
+  icon?: React.ReactNode;
   subtitle?: string;
 }
 
@@ -42,7 +44,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   const getTrendIcon = () => {
     if (!trend) return null;
-    return trend > 0 ? '↑' : '↓';
+    return trend > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />;
   };
 
   const getTrendColor = () => {
@@ -211,7 +213,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             alignItems: 'center',
             gap: 'var(--space-2)',
           }}>
-            <span>{status === 'warning' ? '⚠️' : '🚨'}</span>
+            <span>{status === 'warning' ? <AlertTriangle size={12} /> : <AlertOctagon size={12} />}</span>
             <span>{status === 'warning' ? 'Needs attention' : 'Action required'}</span>
           </div>
         )}

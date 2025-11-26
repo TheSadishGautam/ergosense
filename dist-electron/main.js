@@ -88,8 +88,15 @@ const IPC_CHANNELS = {
   TEST_NOTIFICATION: "test-notification",
   GET_AUTO_START: "get-auto-start",
   SET_AUTO_START: "set-auto-start",
+  GET_SYSTEM_STATS: "get-system-stats",
   GET_APP_SETTING: "get-app-setting",
-  SET_APP_SETTING: "set-app-setting"
+  SET_APP_SETTING: "set-app-setting",
+  UPDATE_AVAILABLE: "update-available",
+  UPDATE_DOWNLOADED: "update-downloaded",
+  START_CALIBRATION: "start-calibration",
+  CALIBRATION_PROGRESS: "calibration-progress",
+  GET_POSTURE_BASELINE: "get-posture-baseline",
+  SET_POSTURE_BASELINE: "set-posture-baseline"
 };
 const MODEL_PATH$1 = electron.app.isPackaged ? path$q.join(process.resourcesPath, "resources", "movenet_lightning.onnx") : path$q.join(__dirname, "../resources/movenet_lightning.onnx");
 class PoseModel {
@@ -241,8 +248,26 @@ class FaceModel {
     return new ort__namespace.Tensor("float32", float32Data, [1, 3, 192, 192]);
   }
 }
+var NotificationType = /* @__PURE__ */ ((NotificationType2) => {
+  NotificationType2["POSTURE"] = "posture";
+  NotificationType2["EYE_STRAIN"] = "eye_strain";
+  NotificationType2["BLINK_RATE"] = "blink_rate";
+  NotificationType2["BREAK_REMINDER"] = "break_reminder";
+  return NotificationType2;
+})(NotificationType || {});
+var PostureZone = /* @__PURE__ */ ((PostureZone2) => {
+  PostureZone2["CENTER"] = "CENTER";
+  PostureZone2["LEFT_TILT"] = "LEFT_TILT";
+  PostureZone2["RIGHT_TILT"] = "RIGHT_TILT";
+  PostureZone2["FORWARD"] = "FORWARD";
+  PostureZone2["TOO_CLOSE"] = "TOO_CLOSE";
+  PostureZone2["TOO_FAR"] = "TOO_FAR";
+  return PostureZone2;
+})(PostureZone || {});
 const KEYPOINTS = {
   NOSE: 0,
+  LEFT_EYE: 1,
+  RIGHT_EYE: 2,
   LEFT_EAR: 3,
   RIGHT_EAR: 4,
   LEFT_SHOULDER: 5,
@@ -276,20 +301,36 @@ function calculatePostureMetrics(keypoints) {
   }
   const dx = headX - shoulderMidX;
   const dy = headY - shoulderMidY;
-  const angleRad = Math.atan2(dx, -dy);
-  const angleDeg = angleRad * (180 / Math.PI);
-  const absAngle = Math.abs(angleDeg);
-  const postureScore = Math.max(0, 1 - absAngle / 45);
+  let forwardAngle = 0;
+  if (dy < 0) {
+    const verticalDistance = Math.abs(dy);
+    const horizontalDistance = Math.abs(dx);
+    forwardAngle = Math.atan2(horizontalDistance, verticalDistance) * (180 / Math.PI);
+  } else {
+    forwardAngle = 45;
+  }
+  let postureScore = 1;
+  if (forwardAngle < 5) {
+    postureScore = 0.95 + (5 - forwardAngle) * 0.01;
+  } else if (forwardAngle < 10) {
+    postureScore = 0.8 + (10 - forwardAngle) / 5 * 0.15;
+  } else if (forwardAngle < 20) {
+    postureScore = 0.5 + (20 - forwardAngle) / 10 * 0.3;
+  } else if (forwardAngle < 30) {
+    postureScore = 0.2 + (30 - forwardAngle) / 10 * 0.3;
+  } else {
+    postureScore = Math.max(0, 0.2 - (forwardAngle - 30) / 20 * 0.2);
+  }
   let postureState = "GOOD";
-  if (absAngle > 30) {
+  if (forwardAngle > 20) {
     postureState = "BAD";
-  } else if (absAngle > 15) {
+  } else if (forwardAngle > 10) {
     postureState = "OK";
   }
   return {
-    postureScore,
+    postureScore: Math.max(0, Math.min(1, postureScore)),
     postureState,
-    neckAngle: angleDeg
+    neckAngle: forwardAngle
   };
 }
 function calculateEAR(landmarks, indices) {
@@ -329,6 +370,106 @@ function calculateEyeMetrics(faceLandmarks) {
     ear: avgEAR
   };
 }
+function detectPostureZone(keypoints) {
+  const leftEar = keypoints[KEYPOINTS.LEFT_EAR];
+  const rightEar = keypoints[KEYPOINTS.RIGHT_EAR];
+  const leftShoulder = keypoints[KEYPOINTS.LEFT_SHOULDER];
+  const rightShoulder = keypoints[KEYPOINTS.RIGHT_SHOULDER];
+  const nose = keypoints[KEYPOINTS.NOSE];
+  const minConfidence = 0.3;
+  let zone = PostureZone.CENTER;
+  let tiltAngle = 0;
+  let forwardAngle = 0;
+  let distanceEstimate = 60;
+  if (leftShoulder.score < minConfidence || rightShoulder.score < minConfidence) {
+    return { zone, tiltAngle, forwardAngle, distanceEstimate };
+  }
+  const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
+  const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
+  let headX = nose.x;
+  let headY = nose.y;
+  if (leftEar.score > minConfidence && rightEar.score > minConfidence) {
+    headX = (leftEar.x + rightEar.x) / 2;
+    headY = (leftEar.y + rightEar.y) / 2;
+    const earDy = rightEar.y - leftEar.y;
+    const earDx = rightEar.x - leftEar.x;
+    tiltAngle = Math.atan2(earDy, earDx) * (180 / Math.PI);
+  }
+  const dx = headX - shoulderMidX;
+  const dy = headY - shoulderMidY;
+  if (dy < 0) {
+    const verticalDistance = Math.abs(dy);
+    const horizontalDistance = Math.abs(dx);
+    forwardAngle = Math.atan2(horizontalDistance, verticalDistance) * (180 / Math.PI);
+  } else {
+    forwardAngle = 45;
+  }
+  const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+  if (shoulderWidth > 0) {
+    distanceEstimate = Math.min(100, Math.max(30, 0.15 / shoulderWidth * 60));
+  }
+  if (distanceEstimate < 40) {
+    zone = PostureZone.TOO_CLOSE;
+  } else if (distanceEstimate > 80) {
+    zone = PostureZone.TOO_FAR;
+  } else if (forwardAngle > 15) {
+    zone = PostureZone.FORWARD;
+  } else if (Math.abs(tiltAngle) > 15) {
+    zone = tiltAngle > 0 ? PostureZone.RIGHT_TILT : PostureZone.LEFT_TILT;
+  } else {
+    zone = PostureZone.CENTER;
+  }
+  return {
+    zone,
+    tiltAngle,
+    forwardAngle,
+    distanceEstimate
+  };
+}
+function calculateHeadDirection(keypoints) {
+  const leftEar = keypoints[KEYPOINTS.LEFT_EAR];
+  const rightEar = keypoints[KEYPOINTS.RIGHT_EAR];
+  const leftEye = keypoints[KEYPOINTS.LEFT_EYE];
+  const rightEye = keypoints[KEYPOINTS.RIGHT_EYE];
+  const nose = keypoints[KEYPOINTS.NOSE];
+  const minConfidence = 0.3;
+  const faceCenterX = (leftEye.x + rightEye.x) / 2;
+  const leftEarVisible = leftEar.score > minConfidence;
+  const rightEarVisible = rightEar.score > minConfidence;
+  const noseOffset = nose.x - faceCenterX;
+  const earVisibilityDiff = rightEar.score - leftEar.score;
+  let yawAngle = 0;
+  let confidence = 0;
+  if (leftEarVisible && rightEarVisible) {
+    yawAngle = earVisibilityDiff * 30;
+    confidence = 0.6;
+  } else if (!leftEarVisible && rightEarVisible) {
+    yawAngle = -45;
+    confidence = 0.9;
+  } else if (leftEarVisible && !rightEarVisible) {
+    yawAngle = 45;
+    confidence = 0.9;
+  } else {
+    yawAngle = 0;
+    confidence = 0.7;
+  }
+  yawAngle += noseOffset * 100;
+  let direction = "CENTER";
+  const threshold = 20;
+  if (yawAngle < -threshold) {
+    direction = "LEFT";
+  } else if (yawAngle > threshold) {
+    direction = "RIGHT";
+  }
+  if (direction !== "CENTER") {
+    confidence = Math.min(1, confidence + 0.1);
+  }
+  return {
+    direction,
+    confidence: Math.max(0, Math.min(1, confidence)),
+    angle: yawAngle
+  };
+}
 class MetricStore {
   constructor() {
     __publicField(this, "db");
@@ -354,6 +495,20 @@ class MetricStore {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS break_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scheduled_time INTEGER NOT NULL,
+        actual_time INTEGER,
+        duration INTEGER NOT NULL,
+        was_taken BOOLEAN NOT NULL,
+        was_snoozed BOOLEAN NOT NULL,
+        effectiveness_score REAL NOT NULL,
+        pre_break_strain REAL NOT NULL,
+        post_break_strain REAL NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_break_time ON break_history(scheduled_time);
     `);
     this.initDefaultSettings();
   }
@@ -369,6 +524,90 @@ class MetricStore {
     const since = Date.now() - timeWindowMs;
     const stmt = this.db.prepare("SELECT * FROM raw_metrics WHERE type = ? AND timestamp > ? ORDER BY timestamp ASC");
     return stmt.all(type2, since);
+  }
+  getZoneMetrics(timeWindowMs) {
+    const since = Date.now() - timeWindowMs;
+    const stmt = this.db.prepare("SELECT * FROM raw_metrics WHERE type = ? AND timestamp > ? ORDER BY timestamp ASC");
+    const records = stmt.all("ZONE", since);
+    const zoneAgg = {};
+    records.forEach((record) => {
+      try {
+        const metadata = JSON.parse(record.metadata);
+        Object.keys(metadata).forEach((zone) => {
+          if (!zoneAgg[zone]) {
+            zoneAgg[zone] = { count: 0, totalPercentage: 0 };
+          }
+          zoneAgg[zone].count += metadata[zone].count || 0;
+          zoneAgg[zone].totalPercentage += metadata[zone].percentage || 0;
+        });
+      } catch (e) {
+      }
+    });
+    const result = Object.keys(zoneAgg).map((zone) => ({
+      zone,
+      count: zoneAgg[zone].count,
+      percentage: records.length > 0 ? zoneAgg[zone].totalPercentage / records.length : 0,
+      duration: 0
+      // Can be calculated from count if needed
+    }));
+    return result;
+  }
+  getMonitorMetrics(timeWindowMs) {
+    const since = Date.now() - timeWindowMs;
+    const stmt = this.db.prepare("SELECT * FROM raw_metrics WHERE type = ? AND timestamp > ? ORDER BY timestamp ASC");
+    const records = stmt.all("MONITOR_GAZE", since);
+    if (records.length === 0) {
+      return {
+        centerTime: 0,
+        leftTime: 0,
+        rightTime: 0,
+        switches: 0,
+        totalTime: 0,
+        data: []
+      };
+    }
+    let totalCenter = 0;
+    let totalLeft = 0;
+    let totalRight = 0;
+    let totalSwitches = 0;
+    let totalSamples = 0;
+    records.forEach((record) => {
+      try {
+        const metadata = JSON.parse(record.metadata);
+        totalCenter += metadata.center || 0;
+        totalLeft += metadata.left || 0;
+        totalRight += metadata.right || 0;
+        totalSwitches += metadata.switches || 0;
+        totalSamples += metadata.total || 0;
+      } catch (e) {
+      }
+    });
+    const total = totalCenter + totalLeft + totalRight;
+    const result = {
+      centerTime: totalCenter,
+      leftTime: totalLeft,
+      rightTime: totalRight,
+      switches: totalSwitches,
+      totalTime: total,
+      data: [
+        {
+          position: "CENTER",
+          duration: totalCenter / total * timeWindowMs / 1e3,
+          percentage: total > 0 ? totalCenter / total * 100 : 0
+        },
+        {
+          position: "LEFT",
+          duration: totalLeft / total * timeWindowMs / 1e3,
+          percentage: total > 0 ? totalLeft / total * 100 : 0
+        },
+        {
+          position: "RIGHT",
+          duration: totalRight / total * timeWindowMs / 1e3,
+          percentage: total > 0 ? totalRight / total * 100 : 0
+        }
+      ]
+    };
+    return result;
   }
   getAllMetrics(timeWindowMs) {
     const since = Date.now() - timeWindowMs;
@@ -447,14 +686,81 @@ class MetricStore {
       throw err;
     }
   }
+  getPostureBaseline() {
+    try {
+      const stmt = this.db.prepare("SELECT value FROM settings WHERE key = ?");
+      const result = stmt.get("postureBaseline");
+      if (result) {
+        return JSON.parse(result.value);
+      }
+      return null;
+    } catch (err) {
+      console.error("Failed to get posture baseline:", err);
+      return null;
+    }
+  }
+  setPostureBaseline(baseline) {
+    try {
+      const stmt = this.db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
+      stmt.run("postureBaseline", JSON.stringify(baseline));
+      console.log("Saved posture baseline:", baseline);
+    } catch (err) {
+      console.error("Failed to set posture baseline:", err);
+      throw err;
+    }
+  }
+  // Break Management
+  addBreakRecord(record) {
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO break_history 
+        (scheduled_time, actual_time, duration, was_taken, was_snoozed, effectiveness_score, pre_break_strain, post_break_strain)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        record.scheduledTime,
+        record.actualTime,
+        record.duration,
+        record.wasTaken ? 1 : 0,
+        record.wasSnoozed ? 1 : 0,
+        record.effectivenessScore,
+        record.preBreakStrain,
+        record.postBreakStrain
+      );
+    } catch (err) {
+      console.error("Failed to add break record:", err);
+    }
+  }
+  getBreakHistory(days = 7) {
+    const since = Date.now() - days * 24 * 60 * 60 * 1e3;
+    const stmt = this.db.prepare("SELECT * FROM break_history WHERE scheduled_time > ? ORDER BY scheduled_time DESC");
+    return stmt.all(since);
+  }
+  getBreakStats(days = 7) {
+    const history = this.getBreakHistory(days);
+    if (history.length === 0) {
+      return {
+        totalScheduled: 0,
+        totalTaken: 0,
+        totalSnoozed: 0,
+        totalSkipped: 0,
+        avgEffectiveness: 0,
+        avgDuration: 0
+      };
+    }
+    const taken = history.filter((b) => b.was_taken);
+    const snoozed = history.filter((b) => b.was_snoozed);
+    const skipped = history.filter((b) => !b.was_taken && !b.was_snoozed);
+    return {
+      totalScheduled: history.length,
+      totalTaken: taken.length,
+      totalSnoozed: snoozed.length,
+      totalSkipped: skipped.length,
+      avgEffectiveness: taken.length > 0 ? taken.reduce((sum, b) => sum + b.effectiveness_score, 0) / taken.length : 0,
+      avgDuration: taken.length > 0 ? taken.reduce((sum, b) => sum + b.duration, 0) / taken.length : 0
+    };
+  }
 }
-var NotificationType = /* @__PURE__ */ ((NotificationType2) => {
-  NotificationType2["POSTURE"] = "posture";
-  NotificationType2["EYE_STRAIN"] = "eye_strain";
-  NotificationType2["BLINK_RATE"] = "blink_rate";
-  NotificationType2["BREAK_REMINDER"] = "break_reminder";
-  return NotificationType2;
-})(NotificationType || {});
 class NotificationManager {
   constructor(settings) {
     __publicField(this, "settings");
@@ -596,6 +902,7 @@ class NotificationManager {
   }
 }
 class MLEngine {
+  // 1 minute
   constructor() {
     __publicField(this, "poseModel");
     __publicField(this, "faceModel");
@@ -630,6 +937,27 @@ class MLEngine {
     __publicField(this, "lastSecondTimestamp", Date.now());
     // Notification Manager
     __publicField(this, "notificationManager");
+    // Calibration state
+    __publicField(this, "isCalibrating", false);
+    __publicField(this, "calibrationData", { shoulderAngles: [], neckAngles: [], headTilts: [], distances: [] });
+    __publicField(this, "calibrationStartTime", 0);
+    __publicField(this, "CALIBRATION_DURATION_MS", 6e4);
+    // 60 seconds
+    // Zone tracking
+    __publicField(this, "zoneDistribution", /* @__PURE__ */ new Map());
+    __publicField(this, "lastZoneFlushTime", Date.now());
+    __publicField(this, "ZONE_FLUSH_INTERVAL", 60 * 1e3);
+    // 1 minute
+    // Monitor gaze tracking
+    __publicField(this, "monitorGazeDistribution", /* @__PURE__ */ new Map([
+      ["CENTER", 0],
+      ["LEFT", 0],
+      ["RIGHT", 0]
+    ]));
+    __publicField(this, "lastMonitorPosition", null);
+    __publicField(this, "monitorSwitches", 0);
+    __publicField(this, "lastMonitorFlushTime", Date.now());
+    __publicField(this, "MONITOR_FLUSH_INTERVAL", 60 * 1e3);
     // Blink Detection State
     __publicField(this, "blinkState", "OPEN");
     __publicField(this, "blinkTimestamps", []);
@@ -654,7 +982,14 @@ class MLEngine {
     const keypoints = await this.poseModel.estimatePose(frame);
     const faceLandmarks = await this.faceModel.estimateFace(frame, keypoints);
     if (keypoints.length > 0) {
+      this.processCalibrationData(keypoints);
       const { postureScore, postureState } = calculatePostureMetrics(keypoints);
+      const { zone } = detectPostureZone(keypoints);
+      this.trackZone(zone);
+      const { direction, confidence } = calculateHeadDirection(keypoints);
+      if (confidence > 0.5) {
+        this.trackMonitorGaze(direction);
+      }
       this.lastState = {
         ...this.lastState,
         postureScore,
@@ -816,6 +1151,74 @@ class MLEngine {
       this.flushMetrics();
       this.lastFlushTime = now;
     }
+    if (now - this.lastZoneFlushTime > this.ZONE_FLUSH_INTERVAL) {
+      this.flushZoneData();
+      this.lastZoneFlushTime = now;
+    }
+    if (now - this.lastMonitorFlushTime > this.MONITOR_FLUSH_INTERVAL) {
+      this.flushMonitorData();
+      this.lastMonitorFlushTime = now;
+    }
+  }
+  trackZone(zone) {
+    const current = this.zoneDistribution.get(zone) || 0;
+    this.zoneDistribution.set(zone, current + 1);
+    const now = Date.now();
+    if (now - this.lastZoneFlushTime >= this.ZONE_FLUSH_INTERVAL) {
+      this.flushZoneData();
+      this.lastZoneFlushTime = now;
+    }
+  }
+  trackMonitorGaze(position) {
+    const current = this.monitorGazeDistribution.get(position) || 0;
+    this.monitorGazeDistribution.set(position, current + 1);
+    if (this.lastMonitorPosition && this.lastMonitorPosition !== position) {
+      this.monitorSwitches++;
+    }
+    this.lastMonitorPosition = position;
+    const now = Date.now();
+    if (now - this.lastMonitorFlushTime >= this.MONITOR_FLUSH_INTERVAL) {
+      this.flushMonitorData();
+      this.lastMonitorFlushTime = now;
+    }
+  }
+  flushZoneData() {
+    if (this.zoneDistribution.size === 0) return;
+    let total = 0;
+    this.zoneDistribution.forEach((count) => total += count);
+    if (total === 0) return;
+    const zoneData = {};
+    this.zoneDistribution.forEach((count, zone) => {
+      zoneData[zone] = {
+        count,
+        percentage: count / total * 100
+      };
+    });
+    this.db.addMetric("ZONE", total, zoneData);
+    console.log("Flushed zone distribution:", zoneData);
+    this.zoneDistribution.clear();
+  }
+  flushMonitorData() {
+    if (this.monitorGazeDistribution.size === 0) return;
+    let total = 0;
+    this.monitorGazeDistribution.forEach((count) => total += count);
+    if (total === 0) return;
+    const monitorData = {
+      center: this.monitorGazeDistribution.get("CENTER") || 0,
+      left: this.monitorGazeDistribution.get("LEFT") || 0,
+      right: this.monitorGazeDistribution.get("RIGHT") || 0,
+      switches: this.monitorSwitches,
+      total
+    };
+    monitorData.centerPercentage = monitorData.center / total * 100;
+    monitorData.leftPercentage = monitorData.left / total * 100;
+    monitorData.rightPercentage = monitorData.right / total * 100;
+    this.db.addMetric("MONITOR_GAZE", total, monitorData);
+    console.log("Flushed monitor gaze distribution:", monitorData);
+    this.monitorGazeDistribution.set("CENTER", 0);
+    this.monitorGazeDistribution.set("LEFT", 0);
+    this.monitorGazeDistribution.set("RIGHT", 0);
+    this.monitorSwitches = 0;
   }
   flushMetrics() {
     let avgPosture = 0;
@@ -841,6 +1244,68 @@ class MLEngine {
     this.postureScoreBuffer = [];
     this.eyeStrainScoreBuffer = [];
     this.blinkCountInInterval = 0;
+  }
+  startCalibration() {
+    console.log("Starting posture calibration...");
+    this.isCalibrating = true;
+    this.calibrationStartTime = Date.now();
+    this.calibrationData = {
+      shoulderAngles: [],
+      neckAngles: [],
+      headTilts: [],
+      distances: []
+    };
+  }
+  processCalibrationData(keypoints) {
+    if (!this.isCalibrating) return;
+    const elapsed = Date.now() - this.calibrationStartTime;
+    if (elapsed >= this.CALIBRATION_DURATION_MS) {
+      this.completeCalibration();
+      return;
+    }
+    const { neckAngle } = calculatePostureMetrics(keypoints);
+    const leftShoulder = keypoints[5];
+    const rightShoulder = keypoints[6];
+    const leftEar = keypoints[3];
+    const rightEar = keypoints[4];
+    if (leftShoulder && rightShoulder && leftShoulder.score > 0.3 && rightShoulder.score > 0.3) {
+      const shoulderAngle = Math.atan2(
+        rightShoulder.y - leftShoulder.y,
+        rightShoulder.x - leftShoulder.x
+      ) * (180 / Math.PI);
+      this.calibrationData.shoulderAngles.push(shoulderAngle);
+    }
+    if (leftEar && rightEar && leftEar.score > 0.3 && rightEar.score > 0.3) {
+      const headTilt = Math.atan2(
+        rightEar.y - leftEar.y,
+        rightEar.x - leftEar.x
+      ) * (180 / Math.PI);
+      this.calibrationData.headTilts.push(headTilt);
+    }
+    this.calibrationData.neckAngles.push(neckAngle);
+    const shoulderWidth = leftShoulder && rightShoulder ? Math.abs(leftShoulder.x - rightShoulder.x) : 0;
+    if (shoulderWidth > 0) {
+      const estimatedDistance = 45 * 640 / (shoulderWidth * 640);
+      this.calibrationData.distances.push(Math.min(100, Math.max(30, estimatedDistance)));
+    }
+  }
+  completeCalibration() {
+    console.log("Completing calibration...");
+    this.isCalibrating = false;
+    const avgShoulder = this.calibrationData.shoulderAngles.length > 0 ? this.calibrationData.shoulderAngles.reduce((a, b) => a + b, 0) / this.calibrationData.shoulderAngles.length : 0;
+    const avgNeck = this.calibrationData.neckAngles.length > 0 ? this.calibrationData.neckAngles.reduce((a, b) => a + b, 0) / this.calibrationData.neckAngles.length : 0;
+    const avgHeadTilt = this.calibrationData.headTilts.length > 0 ? this.calibrationData.headTilts.reduce((a, b) => a + b, 0) / this.calibrationData.headTilts.length : 0;
+    const avgDistance = this.calibrationData.distances.length > 0 ? this.calibrationData.distances.reduce((a, b) => a + b, 0) / this.calibrationData.distances.length : 60;
+    const baseline = {
+      timestamp: Date.now(),
+      shoulderAngle: avgShoulder,
+      neckAngle: avgNeck,
+      headTilt: avgHeadTilt,
+      distanceCm: avgDistance,
+      samples: this.calibrationData.neckAngles.length
+    };
+    this.db.setPostureBaseline(baseline);
+    console.log("Calibration complete:", baseline);
   }
 }
 const SENTRY_DSN = "https://ba4cb4d66328858c1a83a30cfada7d14@o4510356148191232.ingest.us.sentry.io/4510423908417536";
@@ -36149,6 +36614,217 @@ NsisUpdater$1.NsisUpdater = NsisUpdater;
     }
   });
 })(main$1);
+class BreakManager extends require$$0$3.EventEmitter {
+  constructor(store) {
+    super();
+    __publicField(this, "store");
+    __publicField(this, "settings");
+    __publicField(this, "lastBreakTime", Date.now());
+    __publicField(this, "nextBreakTime");
+    __publicField(this, "workSessionStartTime", Date.now());
+    __publicField(this, "activeWorkTime", 0);
+    // milliseconds
+    __publicField(this, "isUserPresent", false);
+    __publicField(this, "currentStrainScore", 0);
+    __publicField(this, "breakInProgress", false);
+    __publicField(this, "breakStartTime", null);
+    __publicField(this, "intervalTimer", null);
+    this.store = store;
+    this.settings = this.loadSettings();
+    this.nextBreakTime = this.calculateNextBreakTime();
+    this.startTimer();
+  }
+  loadSettings() {
+    const stored = this.store.getAppSetting("breakSettings");
+    return stored || {
+      enabled: true,
+      baseInterval: 45,
+      breakDuration: 5,
+      adaptToStrain: true,
+      soundEnabled: true,
+      showCountdown: true,
+      quietHours: []
+    };
+  }
+  updateSettings(settings) {
+    this.settings = { ...this.settings, ...settings };
+    this.store.setAppSetting("breakSettings", this.settings);
+    if (settings.baseInterval || settings.adaptToStrain !== void 0) {
+      this.nextBreakTime = this.calculateNextBreakTime();
+    }
+  }
+  getSettings() {
+    return { ...this.settings };
+  }
+  startTimer() {
+    this.intervalTimer = setInterval(() => {
+      this.checkBreakTime();
+    }, 1e4);
+  }
+  updateActivity(isPresent, strainScore) {
+    const now = Date.now();
+    if (isPresent && this.isUserPresent) {
+      this.activeWorkTime += now - this.workSessionStartTime;
+    }
+    this.isUserPresent = isPresent;
+    this.currentStrainScore = strainScore;
+    this.workSessionStartTime = now;
+    if (isPresent && this.activeWorkTime > 5 * 60 * 1e3) {
+      this.lastBreakTime = now;
+      this.nextBreakTime = this.calculateNextBreakTime();
+      this.activeWorkTime = 0;
+    }
+  }
+  calculateNextBreakTime() {
+    let intervalMs = this.settings.baseInterval * 60 * 1e3;
+    if (this.settings.adaptToStrain) {
+      if (this.currentStrainScore > 0.6) {
+        intervalMs = 30 * 60 * 1e3;
+      } else if (this.currentStrainScore < 0.3) {
+        intervalMs = 60 * 60 * 1e3;
+      }
+      const hour = (/* @__PURE__ */ new Date()).getHours();
+      if (hour >= 15) {
+        intervalMs *= 0.9;
+      }
+    }
+    return this.lastBreakTime + intervalMs;
+  }
+  checkBreakTime() {
+    if (!this.settings.enabled || this.breakInProgress) return;
+    const now = Date.now();
+    if (this.isInQuietHours()) {
+      if (this.settings.showCountdown) {
+        this.emit("countdown-update", {
+          timeRemaining: 0,
+          nextBreakTime: 0,
+          isQuietMode: true
+        });
+      }
+      return;
+    }
+    if (now >= this.nextBreakTime && this.isUserPresent) {
+      this.triggerBreak();
+    }
+    const timeUntilBreak = this.nextBreakTime - now;
+    if (this.settings.showCountdown && timeUntilBreak > 0) {
+      this.emit("countdown-update", {
+        timeRemaining: Math.floor(timeUntilBreak / 1e3),
+        // seconds
+        nextBreakTime: this.nextBreakTime
+      });
+    }
+    if (this.settings.soundEnabled && timeUntilBreak <= 5 * 60 * 1e3 && timeUntilBreak > 4.9 * 60 * 1e3) {
+      this.emit("break-warning", { minutesRemaining: 5 });
+    }
+  }
+  isInQuietHours() {
+    if (!this.settings.quietHours || this.settings.quietHours.length === 0) {
+      return false;
+    }
+    const now = /* @__PURE__ */ new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    return this.settings.quietHours.some(({ start, end }) => {
+      return currentTime >= start && currentTime <= end;
+    });
+  }
+  triggerBreak() {
+    this.breakInProgress = true;
+    this.emit("break-due", {
+      duration: this.settings.breakDuration,
+      strain: this.currentStrainScore
+    });
+  }
+  snoozeBreak(minutes = 10) {
+    this.breakInProgress = false;
+    this.nextBreakTime = Date.now() + minutes * 60 * 1e3;
+    this.recordBreak({
+      scheduledTime: Date.now(),
+      actualTime: null,
+      duration: 0,
+      wasTaken: false,
+      wasSnoozed: true,
+      effectivenessScore: 0,
+      preBreakStrain: this.currentStrainScore,
+      postBreakStrain: this.currentStrainScore
+    });
+  }
+  skipBreak() {
+    this.breakInProgress = false;
+    this.lastBreakTime = Date.now();
+    this.nextBreakTime = this.calculateNextBreakTime();
+    this.recordBreak({
+      scheduledTime: Date.now(),
+      actualTime: null,
+      duration: 0,
+      wasTaken: false,
+      wasSnoozed: false,
+      effectivenessScore: 0,
+      preBreakStrain: this.currentStrainScore,
+      postBreakStrain: this.currentStrainScore
+    });
+  }
+  startBreak() {
+    this.breakStartTime = Date.now();
+    this.breakInProgress = true;
+  }
+  endBreak(postBreakStrain) {
+    if (!this.breakStartTime) return;
+    const duration = Math.floor((Date.now() - this.breakStartTime) / 1e3 / 60);
+    const userLeftComputer = !this.isUserPresent;
+    const effectivenessScore = this.calculateEffectiveness(
+      duration,
+      userLeftComputer,
+      this.currentStrainScore,
+      postBreakStrain
+    );
+    this.recordBreak({
+      scheduledTime: this.nextBreakTime,
+      actualTime: this.breakStartTime,
+      duration,
+      wasTaken: true,
+      wasSnoozed: false,
+      effectivenessScore,
+      preBreakStrain: this.currentStrainScore,
+      postBreakStrain
+    });
+    this.breakInProgress = false;
+    this.breakStartTime = null;
+    this.lastBreakTime = Date.now();
+    this.activeWorkTime = 0;
+    this.nextBreakTime = this.calculateNextBreakTime();
+  }
+  calculateEffectiveness(duration, leftComputer, preStrain, postStrain) {
+    let score = 0;
+    score += 0.4;
+    if (duration >= this.settings.breakDuration) {
+      score += 0.3;
+    } else {
+      score += 0.3 * (duration / this.settings.breakDuration);
+    }
+    if (leftComputer) {
+      score += 0.2;
+    }
+    const strainReduction = Math.max(0, preStrain - postStrain);
+    score += 0.1 * Math.min(1, strainReduction / 0.3);
+    return Math.min(1, score);
+  }
+  recordBreak(record) {
+    this.store.addBreakRecord(record);
+    this.emit("break-recorded", record);
+  }
+  getTimeUntilNextBreak() {
+    return Math.max(0, this.nextBreakTime - Date.now());
+  }
+  getBreakHistory(days = 7) {
+    return this.store.getBreakHistory(days);
+  }
+  destroy() {
+    if (this.intervalTimer) {
+      clearInterval(this.intervalTimer);
+    }
+  }
+}
 log.transports.file.level = "info";
 main$1.autoUpdater.logger = log;
 init({
@@ -36160,6 +36836,7 @@ let win;
 let tray = null;
 let isQuitting = false;
 const mlEngine = new MLEngine();
+const breakManager = new BreakManager(mlEngine.getStore());
 function createTray() {
   const iconPath = path$q.join(__dirname, "../renderer/src/assets/icon.png");
   const icon = electron.nativeImage.createFromPath(iconPath);
@@ -36215,7 +36892,19 @@ function createWindow() {
   win.webContents.on("did-finish-load", () => {
     win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
-  main$1.autoUpdater.checkForUpdatesAndNotify();
+  main$1.autoUpdater.checkForUpdates();
+  main$1.autoUpdater.on("update-available", (info2) => {
+    win == null ? void 0 : win.webContents.send(IPC_CHANNELS.UPDATE_AVAILABLE, info2);
+  });
+  main$1.autoUpdater.on("update-downloaded", (info2) => {
+    win == null ? void 0 : win.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info2);
+  });
+  win.webContents.setWindowOpenHandler(({ url: url2 }) => {
+    if (url2.startsWith("https:")) {
+      require("electron").shell.openExternal(url2);
+    }
+    return { action: "deny" };
+  });
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
@@ -36240,14 +36929,29 @@ electron.app.on("before-quit", () => {
 electron.app.whenReady().then(() => {
   createWindow();
   createTray();
+  let isProcessingFrame = false;
   electron.ipcMain.on(IPC_CHANNELS.SEND_FRAME, async (event, frame) => {
-    const result = await mlEngine.processFrame(frame);
-    if (win && !win.isDestroyed()) {
-      win.webContents.send(IPC_CHANNELS.LIVE_STATE_UPDATE, result);
+    if (isProcessingFrame) return;
+    isProcessingFrame = true;
+    try {
+      const result = await mlEngine.processFrame(frame);
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.LIVE_STATE_UPDATE, result);
+      }
+    } catch (error2) {
+      console.error("Error processing frame:", error2);
+    } finally {
+      isProcessingFrame = false;
     }
   });
   electron.ipcMain.handle(IPC_CHANNELS.GET_METRICS, (event, type2, timeWindowMs) => {
     return mlEngine.getStore().getMetrics(type2, timeWindowMs);
+  });
+  electron.ipcMain.handle("get-zone-metrics", (event, timeWindowMs) => {
+    return mlEngine.getStore().getZoneMetrics(timeWindowMs);
+  });
+  electron.ipcMain.handle("get-monitor-metrics", (event, timeWindowMs) => {
+    return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
   });
   electron.ipcMain.handle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
     return mlEngine.getStore().getNotificationSettings();
@@ -36270,7 +36974,16 @@ electron.app.whenReady().then(() => {
       openAsHidden: true
       // Optional: start hidden
     });
-    return electron.app.getLoginItemSettings().openAtLogin;
+    return true;
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
+    const memory = await process.getProcessMemoryInfo();
+    const cpu = process.getCPUUsage();
+    return {
+      memory: Math.round(memory.private / 1024),
+      // Convert KB to MB
+      cpu: cpu.percentCPUUsage
+    };
   });
   electron.ipcMain.handle(IPC_CHANNELS.GET_APP_SETTING, (event, key) => {
     return mlEngine.getStore().getAppSetting(key);
@@ -36278,5 +36991,54 @@ electron.app.whenReady().then(() => {
   electron.ipcMain.handle(IPC_CHANNELS.SET_APP_SETTING, (event, key, value) => {
     mlEngine.getStore().setAppSetting(key, value);
     return true;
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.START_CALIBRATION, async () => {
+    mlEngine.startCalibration();
+    return;
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
+    return mlEngine.getStore().getPostureBaseline();
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
+    mlEngine.getStore().setPostureBaseline(baseline);
+    return;
+  });
+  electron.ipcMain.handle("get-break-settings", () => {
+    return breakManager.getSettings();
+  });
+  electron.ipcMain.handle("update-break-settings", (event, settings) => {
+    breakManager.updateSettings(settings);
+    return true;
+  });
+  electron.ipcMain.handle("snooze-break", () => {
+    breakManager.snoozeBreak(10);
+    return true;
+  });
+  electron.ipcMain.handle("skip-break", () => {
+    breakManager.skipBreak();
+    return true;
+  });
+  electron.ipcMain.handle("start-break", () => {
+    breakManager.startBreak();
+    return true;
+  });
+  electron.ipcMain.handle("end-break", (event, postBreakStrain) => {
+    breakManager.endBreak(postBreakStrain);
+    return true;
+  });
+  electron.ipcMain.handle("get-break-stats", (event, days) => {
+    return mlEngine.getStore().getBreakStats(days || 7);
+  });
+  electron.ipcMain.handle("get-time-until-break", () => {
+    return breakManager.getTimeUntilNextBreak();
+  });
+  breakManager.on("countdown-update", (data) => {
+    win == null ? void 0 : win.webContents.send("break-countdown-update", data);
+  });
+  breakManager.on("break-due", (data) => {
+    win == null ? void 0 : win.webContents.send("break-due", data);
+  });
+  breakManager.on("break-warning", (data) => {
+    win == null ? void 0 : win.webContents.send("break-warning", data);
   });
 });

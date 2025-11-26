@@ -5,7 +5,13 @@ import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
 import { Onboarding } from './components/Onboarding';
 import { UpdateBanner } from './components/UpdateBanner';
+import { CalibrationView } from './components/CalibrationView';
+import { StretchGuide } from './components/StretchGuide';
+import { SystemMonitor } from './components/SystemMonitor';
+import { BreakCountdown } from './components/BreakCountdown';
+import { BreakPrompt } from './components/BreakPrompt';
 import { LiveState } from '../../models/types';
+import { Lock, Shield, Activity, LayoutDashboard, Settings as SettingsIcon, Video, RotateCcw } from 'lucide-react';
 import logoIcon from './assets/icon.png';
 import './styles.css';
 
@@ -14,7 +20,17 @@ function App() {
   const [view, setView] = useState<'LIVE' | 'DASHBOARD' | 'SETTINGS'>('LIVE');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  const [showCalibration, setShowCalibration] = useState(false);
+  const [showStretchGuide, setShowStretchGuide] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [poorPostureStartTime, setPoorPostureStartTime] = useState<number | null>(null);
+  
+  // Break management state
+  const [showBreakPrompt, setShowBreakPrompt] = useState(false);
+  const [breakDuration, setBreakDuration] = useState(5);
+  const [timeUntilBreak, setTimeUntilBreak] = useState(0);
+  const [showBreakCountdown, setShowBreakCountdown] = useState(false);
+  const [isQuietMode, setIsQuietMode] = useState(false);
 
   useEffect(() => {
     // Check onboarding status
@@ -48,6 +64,78 @@ function App() {
     };
   }, []);
 
+  // Break event listeners
+  useEffect(() => {
+    const unsubCountdown = window.electronAPI.onBreakCountdownUpdate((data) => {
+      setTimeUntilBreak(data.timeRemaining);
+      setIsQuietMode(!!data.isQuietMode);
+      setShowBreakCountdown(true);
+    });
+
+    const unsubBreakDue = window.electronAPI.onBreakDue((data) => {
+      setBreakDuration(data.duration);
+      setShowBreakPrompt(true);
+      // Optional: Play sound notification
+    });
+
+    const unsubWarning = window.electronAPI.onBreakWarning((data) => {
+      // Optional: Play warning ping at 5 minutes
+      console.log(`Break in ${data.minutesRemaining} minutes`);
+    });
+
+    return () => {
+      unsubCountdown();
+      unsubBreakDue();
+      unsubWarning();
+    };
+  }, []);
+
+  const handleTakeBreak = async () => {
+    setShowBreakPrompt(false);
+    await window.electronAPI.startBreak();
+    // Break timer would be managed by the app
+    // After break ends, call endBreak with current strain
+    setTimeout(async () => {
+      const currentStrain = liveState ? (liveState.postureScore + liveState.eyeStrainScore) / 2 : 0;
+      await window.electronAPI.endBreak(currentStrain);
+    }, breakDuration * 60 * 1000);
+  };
+
+  const handleSnoozeBreak = async () => {
+    setShowBreakPrompt(false);
+    await window.electronAPI.snoozeBreak();
+  };
+
+  const handleSkipBreak = async () => {
+    setShowBreakPrompt(false);
+    await window.electronAPI.skipBreak();
+  };
+
+
+  // Track poor posture and trigger stretch guide
+  useEffect(() => {
+    if (!liveState) return;
+
+    const POOR_POSTURE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+
+    if (liveState.postureState === 'BAD') {
+      if (poorPostureStartTime === null) {
+        setPoorPostureStartTime(Date.now());
+      } else {
+        const duration = Date.now() - poorPostureStartTime;
+        if (duration >= POOR_POSTURE_THRESHOLD && !showStretchGuide && !showCalibration) {
+          setShowStretchGuide(true);
+          setPoorPostureStartTime(null); // Reset timer
+        }
+      }
+    } else {
+      // Good posture, reset timer
+      if (poorPostureStartTime !== null) {
+        setPoorPostureStartTime(null);
+      }
+    }
+  }, [liveState, poorPostureStartTime, showStretchGuide, showCalibration]);
+
   const handleOnboardingComplete = async () => {
     try {
       await window.electronAPI.setAppSetting('onboardingCompleted', true);
@@ -56,6 +144,35 @@ function App() {
       console.error('Failed to save onboarding status:', err);
       setShowOnboarding(false);
     }
+  };
+
+  const handleCalibrationComplete = () => {
+    setShowCalibration(false);
+  };
+
+  const handleStretchComplete = () => {
+    setShowStretchGuide(false);
+  };
+
+  const handleStretchSnooze = () => {
+    setShowStretchGuide(false);
+    // Restart poor posture timer (5 minutes from now will trigger again if still bad posture)
+    setPoorPostureStartTime(Date.now() - (5 * 60 * 1000)); // Set timer to 5 minutes ago
+  };
+
+  const handleStretchDismiss = () => {
+    setShowStretchGuide(false);
+    setPoorPostureStartTime(null); // Reset completely
+  };
+
+  // Expose calibration trigger for Settings component
+  (window as any).triggerCalibration = () => {
+    setShowCalibration(true);
+  };
+
+  // Expose stretch guide trigger for Settings component
+  (window as any).triggerStretchGuide = () => {
+    setShowStretchGuide(true);
   };
 
   if (loading) {
@@ -80,110 +197,81 @@ function App() {
     }}>
       {showUpdateBanner && <UpdateBanner onDismiss={() => setShowUpdateBanner(false)} />}
       {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
+      {showCalibration && <CalibrationView onComplete={handleCalibrationComplete} onCancel={() => setShowCalibration(false)} />}
+      {showStretchGuide && <StretchGuide onComplete={handleStretchComplete} onSnooze={handleStretchSnooze} onDismiss={handleStretchDismiss} />}
       
-      {/* Top Bar */}
+      {/* Simple Clean Top Bar */}
       <div style={{
         background: 'rgba(17, 24, 39, 0.8)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(234, 88, 12, 0.2)',
-        padding: 'var(--space-4) var(--space-8)',
-      }} className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            {/* Logo Icon */}
+        padding: 'var(--space-4) var(--space-6)',
+      }}>
+        <div style={{
+          maxWidth: '1400px',
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <img 
               src={logoIcon}
               alt="ErgoSense" 
               style={{
-                width: '40px',
-                height: '40px',
-                objectFit: 'contain',
+                width: '24px',
+                height: '32px',
               }}
             />
-            <h1 style={{ 
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: 'white',
-              margin: 0,
-            }}>
-              ErgoSense
-            </h1>
+            <div>
+              <h1 style={{ 
+                fontSize: '1.25rem',
+                fontWeight: 700,
+                color: 'white',
+                margin: 0,
+                lineHeight: 1,
+              }}>
+                ErgoSense
+              </h1>
+              <div style={{
+                fontSize: '0.7rem',
+                color: 'var(--text-tertiary)',
+                marginTop: '2px',
+              }}>
+                AI Ergonomics Assistant
+              </div>
+            </div>
           </div>
-          <div className="badge badge-success" style={{ fontSize: '0.7rem' }}>
-            LIVE
-          </div>
-        </div>
 
-        <div className="flex gap-3">
-          <button 
-            onClick={() => setView('LIVE')} 
-            className={`btn ${view === 'LIVE' ? 'btn-active' : 'btn-ghost'}`}
-            style={{
-              transition: 'all 0.3s ease',
-              transform: view === 'LIVE' ? 'scale(1.05)' : 'scale(1)',
-            }}
-            onMouseEnter={(e) => {
-              if (view !== 'LIVE') {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (view !== 'LIVE') {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.background = '';
-              }
-            }}
-          >
-            <span style={{ fontSize: '1.125rem', marginRight: 'var(--space-2)' }}>📹</span>
-            Live View
-          </button>
-          <button 
-            onClick={() => setView('DASHBOARD')} 
-            className={`btn ${view === 'DASHBOARD' ? 'btn-active' : 'btn-ghost'}`}
-            style={{
-              transition: 'all 0.3s ease',
-              transform: view === 'DASHBOARD' ? 'scale(1.05)' : 'scale(1)',
-            }}
-            onMouseEnter={(e) => {
-              if (view !== 'DASHBOARD') {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (view !== 'DASHBOARD') {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.background = '';
-              }
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 'var(--space-2)' }}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-            Dashboard
-          </button>
-          <button 
-            onClick={() => setView('SETTINGS')} 
-            className={`btn ${view === 'SETTINGS' ? 'btn-active' : 'btn-ghost'}`}
-            style={{
-              transition: 'all 0.3s ease',
-              transform: view === 'SETTINGS' ? 'scale(1.05)' : 'scale(1)',
-            }}
-            onMouseEnter={(e) => {
-              if (view !== 'SETTINGS') {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (view !== 'SETTINGS') {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.background = '';
-              }
-            }}
-          >
-            <span style={{ fontSize: '1.125rem', marginRight: 'var(--space-2)' }}>⚙️</span>
-            Settings
-          </button>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              {[
+                { id: 'LIVE', label: 'Live', icon: <Video size={18} /> },
+                { id: 'DASHBOARD', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+                { id: 'SETTINGS', label: 'Settings', icon: <SettingsIcon size={18} /> },
+              ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setView(tab.id as any)}
+                style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: view === tab.id ? 'var(--gradient-primary)' : 'transparent',
+                  color: view === tab.id ? 'white' : 'var(--text-secondary)',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                }}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -224,7 +312,7 @@ function App() {
                     alignItems: 'start',
                     gap: 'var(--space-3)',
                   }}>
-                    <span style={{ fontSize: '1.25rem' }}>🔒</span>
+                    <Shield size={24} className="text-success" />
                     <div>
                       <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: 'var(--success-light)' }}>
                         100% Private & Secure
@@ -234,6 +322,7 @@ function App() {
                       </p>
                     </div>
                   </div>
+                  <SystemMonitor />
                 </div>
                 <div>
                   <h3 style={{ 
@@ -257,6 +346,24 @@ function App() {
       </div>
 
       {/* Footer */}
+      {/* Break Management UI */}
+      {showBreakCountdown && view === 'LIVE' && (
+        <BreakCountdown 
+          timeRemaining={timeUntilBreak} 
+          isQuietMode={isQuietMode}
+          onViewDetails={() => setView('SETTINGS')}
+        />
+      )}
+
+      {showBreakPrompt && (
+        <BreakPrompt
+          duration={breakDuration}
+          onTakeBreak={handleTakeBreak}
+          onSnooze={handleSnoozeBreak}
+          onSkip={handleSkipBreak}
+        />
+      )}
+
       <div style={{
         position: 'fixed',
         bottom: 0,

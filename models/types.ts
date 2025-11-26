@@ -32,7 +32,7 @@ export interface LiveState {
 export interface MetricRecord {
   id: number;
   timestamp: number;
-  type: 'POSTURE' | 'EYE' | 'BLINK';
+  type: 'POSTURE' | 'EYE' | 'BLINK' | 'ZONE' | 'MONITOR_GAZE';
   value: number;
   metadata: string;
 }
@@ -62,4 +62,45 @@ export enum NotificationType {
   EYE_STRAIN = 'eye_strain',
   BLINK_RATE = 'blink_rate',
   BREAK_REMINDER = 'break_reminder'
+}
+
+export interface PostureBaseline {
+  timestamp: number;
+  shoulderAngle: number; // Average shoulder alignment angle
+  neckAngle: number; // Average neck forward angle
+  headTilt: number; // Average head tilt (left/right)
+  distanceCm: number; // Average distance from screen
+  samples: number; // Number of samples collected during calibration
+}
+
+export enum PostureZone {
+  CENTER = 'CENTER',
+  LEFT_TILT = 'LEFT_TILT',
+  RIGHT_TILT = 'RIGHT_TILT',
+  FORWARD = 'FORWARD',
+  TOO_CLOSE = 'TOO_CLOSE',
+  TOO_FAR = 'TOO_FAR'
+}
+
+export interface PostureZoneData {
+  zone: PostureZone;
+  duration: number; // seconds spent in this zone
+  percentage: number; // percentage of total time
+  count: number; // number of samples in this zone
+}
+
+export type MonitorPosition = 'CENTER' | 'LEFT' | 'RIGHT';
+
+export interface MonitorGazeData {
+  position: MonitorPosition;
+  duration: number; // seconds spent looking at this position
+  percentage: number; // percentage of total time
+}
+
+export interface MonitorMetrics {
+  centerTime: number;
+  leftTime: number;
+  rightTime: number;
+  switches: number; // number of times user switched between monitors
+  totalTime: number;
 }

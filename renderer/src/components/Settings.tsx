@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NotificationSettings, NotificationType } from '../../../models/types';
+import { 
+  Bell, Clock, Monitor, Settings as SettingsIcon, Volume2, 
+  Moon, Sun, Check, X, RotateCcw, Save, Activity, Eye, Zap, 
+  Trash2, Plus, AlertCircle 
+} from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<NotificationSettings>({
@@ -10,10 +15,35 @@ export const Settings: React.FC = () => {
     sound: false,
   });
   
+  const [breakSettings, setBreakSettings] = useState<any>({
+    enabled: true,
+    baseInterval: 45,
+    breakDuration: 5,
+    adaptToStrain: true,
+    soundEnabled: true,
+    showCountdown: true,
+    quietHours: [],
+  });
+
   const [autoStart, setAutoStart] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Dirty state tracking
+  const initialSettingsRef = useRef<NotificationSettings | null>(null);
+  const initialBreakSettingsRef = useRef<any | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Check for changes
+  useEffect(() => {
+    if (!initialSettingsRef.current || !initialBreakSettingsRef.current) return;
+
+    const settingsChanged = JSON.stringify(settings) !== JSON.stringify(initialSettingsRef.current);
+    const breakSettingsChanged = JSON.stringify(breakSettings) !== JSON.stringify(initialBreakSettingsRef.current);
+    
+    setIsDirty(settingsChanged || breakSettingsChanged);
+  }, [settings, breakSettings]);
 
   useEffect(() => {
     loadSettings();
@@ -23,6 +53,19 @@ export const Settings: React.FC = () => {
     try {
       const loaded = await window.electronAPI.getNotificationSettings();
       setSettings(loaded);
+      
+      // Load break settings
+      try {
+        const loadedBreaks = await window.electronAPI.getBreakSettings();
+        if (loadedBreaks) {
+          setBreakSettings(loadedBreaks);
+          initialBreakSettingsRef.current = JSON.parse(JSON.stringify(loadedBreaks));
+        }
+      } catch (e) {
+        console.warn('Failed to load break settings', e);
+      }
+      
+      initialSettingsRef.current = JSON.parse(JSON.stringify(loaded));
       
       // Load auto-start setting
       try {
@@ -57,6 +100,13 @@ export const Settings: React.FC = () => {
     setSaving(true);
     try {
       await window.electronAPI.updateNotificationSettings(settings);
+      await window.electronAPI.updateBreakSettings(breakSettings);
+      
+      // Update initial state
+      initialSettingsRef.current = JSON.parse(JSON.stringify(settings));
+      initialBreakSettingsRef.current = JSON.parse(JSON.stringify(breakSettings));
+      setIsDirty(false);
+
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       
       // Auto-dismiss after 3 seconds
@@ -87,10 +137,20 @@ export const Settings: React.FC = () => {
     });
   };
 
+  const handleReset = () => {
+    if (initialSettingsRef.current) {
+      setSettings(JSON.parse(JSON.stringify(initialSettingsRef.current)));
+    }
+    if (initialBreakSettingsRef.current) {
+      setBreakSettings(JSON.parse(JSON.stringify(initialBreakSettingsRef.current)));
+    }
+  };
+
   if (loading) {
     return (
-      <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div className="animate-pulse">Loading settings...</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
+        <div className="animate-spin" style={{ marginRight: 'var(--space-2)' }}><RotateCcw size={20} /></div>
+        Loading settings...
       </div>
     );
   }
@@ -279,94 +339,253 @@ export const Settings: React.FC = () => {
 
           <button
             onClick={() => testNotification(NotificationType.BLINK_RATE)}
-            className="btn btn-sm"
+            className="btn btn-sm flex items-center gap-2"
             style={{ background: 'var(--gradient-orange)', color: 'white' }}
           >
-            🔔 Test Alert
+            <Bell size={16} /> Test Alert
           </button>
         </div>
 
-        {/* Break Reminders */}
+        {/* Smart Break Reminders */}
         <div className="card">
           <div className="flex justify-between items-start" style={{ marginBottom: 'var(--space-4)' }}>
             <div>
               <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-2)' }}>
-                <span style={{ fontSize: '1.5rem' }}>⏰</span>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Break Reminders</h3>
+                <Clock size={20} />
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Smart Break Reminders</h3>
               </div>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', margin: 0 }}>
-                Regular reminders to follow the 20-20-20 rule
+                Intelligent break scheduling based on your activity and strain
               </p>
             </div>
             <label className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
               <input
                 type="checkbox"
-                checked={settings.breaks.enabled}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  breaks: { ...settings.breaks, enabled: e.target.checked }
-                })}
+                checked={breakSettings.enabled}
+                onChange={(e) => setBreakSettings({ ...breakSettings, enabled: e.target.checked })}
                 style={{ width: '20px', height: '20px', cursor: 'pointer' }}
               />
               <span style={{ fontWeight: 600 }}>Enabled</span>
             </label>
           </div>
 
-          <div style={{ marginBottom: 'var(--space-4)' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', display: 'block' }}>
-              Reminder Interval
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+            
+            {/* Base Interval */}
+            <div>
+              <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-2)' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Work Interval</label>
+                <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-orange)' }}>
+                  {breakSettings.baseInterval} min
+                </span>
+              </div>
+              <input
+                type="range"
+                min="30"
+                max="90"
+                step="5"
+                value={breakSettings.baseInterval}
+                onChange={(e) => setBreakSettings({ ...breakSettings, baseInterval: parseInt(e.target.value) })}
+                disabled={!breakSettings.enabled}
+                style={{ width: '100%' }}
+              />
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-1)' }}>
+                Base time between breaks (adjusted by strain if adaptive)
+              </p>
+            </div>
+
+            {/* Break Duration */}
+            <div>
+              <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-2)' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Break Duration</label>
+                <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-orange)' }}>
+                  {breakSettings.breakDuration} min
+                </span>
+              </div>
+              <input
+                type="range"
+                min="3"
+                max="15"
+                step="1"
+                value={breakSettings.breakDuration}
+                onChange={(e) => setBreakSettings({ ...breakSettings, breakDuration: parseInt(e.target.value) })}
+                disabled={!breakSettings.enabled}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            {/* Toggles */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <label className="flex items-center gap-3" style={{ cursor: 'pointer', padding: 'var(--space-3)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                <input
+                  type="checkbox"
+                  checked={breakSettings.adaptToStrain}
+                  onChange={(e) => setBreakSettings({ ...breakSettings, adaptToStrain: e.target.checked })}
+                  disabled={!breakSettings.enabled}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>Adaptive Timing</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Adjust based on strain</div>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3" style={{ cursor: 'pointer', padding: 'var(--space-3)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                <input
+                  type="checkbox"
+                  checked={breakSettings.soundEnabled}
+                  onChange={(e) => setBreakSettings({ ...breakSettings, soundEnabled: e.target.checked })}
+                  disabled={!breakSettings.enabled}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>Sound Alerts</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Ping before break</div>
+                </div>
+              </label>
+            </div>
+
+            <label className="flex items-center gap-3" style={{ cursor: 'pointer', padding: 'var(--space-3)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+              <input
+                type="checkbox"
+                checked={breakSettings.showCountdown}
+                onChange={(e) => setBreakSettings({ ...breakSettings, showCountdown: e.target.checked })}
+                disabled={!breakSettings.enabled}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>Show Countdown</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Mini timer in bottom corner</div>
+              </div>
             </label>
-            <div className="flex gap-2">
-              {[10, 20, 30, 60].map(interval => (
+
+            {/* Quiet Hours */}
+            <div style={{ padding: 'var(--space-3)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>Quiet Hours</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-3)' }}>
+                No break reminders during these times
+              </div>
+
+              {/* List of quiet hours */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                {breakSettings.quietHours && breakSettings.quietHours.map((range: any, index: number) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: 'var(--space-2)',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}>
+                    <span style={{ fontSize: '0.875rem', fontFamily: 'monospace' }}>
+                      {range.start} - {range.end}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newHours = [...breakSettings.quietHours];
+                        newHours.splice(index, 1);
+                        setBreakSettings({ ...breakSettings, quietHours: newHours });
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                      title="Remove"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {(!breakSettings.quietHours || breakSettings.quietHours.length === 0) && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                    No quiet hours set
+                  </div>
+                )}
+              </div>
+
+              {/* Add new range */}
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <input
+                  type="time"
+                  id="quiet-start"
+                  style={{ 
+                    background: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    padding: 'var(--space-1)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.875rem'
+                  }}
+                />
+                <span style={{ color: 'var(--text-tertiary)' }}>to</span>
+                <input
+                  type="time"
+                  id="quiet-end"
+                  style={{ 
+                    background: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    padding: 'var(--space-1)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.875rem'
+                  }}
+                />
                 <button
-                  key={interval}
-                  onClick={() => setSettings({
-                    ...settings,
-                    breaks: { ...settings.breaks, intervalMinutes: interval }
-                  })}
-                  disabled={!settings.breaks.enabled}
+                  onClick={() => {
+                    const startInput = document.getElementById('quiet-start') as HTMLInputElement;
+                    const endInput = document.getElementById('quiet-end') as HTMLInputElement;
+                    
+                    if (startInput.value && endInput.value) {
+                      const newHours = [...(breakSettings.quietHours || [])];
+                      newHours.push({ start: startInput.value, end: endInput.value });
+                      setBreakSettings({ ...breakSettings, quietHours: newHours });
+                      
+                      // Clear inputs
+                      startInput.value = '';
+                      endInput.value = '';
+                    }
+                  }}
                   className="btn btn-sm"
-                  style={{
-                    background: settings.breaks.intervalMinutes === interval ? 'var(--gradient-orange)' : 'transparent',
-                    color: settings.breaks.intervalMinutes === interval ? 'white' : 'var(--text-secondary)',
-                    border: '1px solid var(--brand-orange)',
+                  style={{ 
+                    padding: 'var(--space-1) var(--space-3)',
+                    fontSize: '0.75rem'
                   }}
                 >
-                  {interval} min
+                  Add
                 </button>
-              ))}
-            </div>
-            <div style={{
-              marginTop: 'var(--space-4)',
-              padding: 'var(--space-3)',
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.875rem',
-            }}>
-              <strong>💡 20-20-20 Rule:</strong> Every 20 minutes, look at something 20 feet away for 20 seconds
+              </div>
             </div>
           </div>
 
           <button
-            onClick={() => testNotification(NotificationType.BREAK_REMINDER)}
-            className="btn btn-sm"
+            onClick={async () => {
+              await window.electronAPI.startBreak();
+            }}
+            className="btn btn-sm flex items-center gap-2"
             style={{ background: 'var(--gradient-orange)', color: 'white' }}
           >
-            🔔 Test Reminder
+            <Bell size={16} /> Test Break Prompt
           </button>
         </div>
 
         {/* System Settings */}
         <div className="card">
-          <h3 style={{ marginBottom: 'var(--space-4)', fontSize: '1.25rem', fontWeight: 700 }}>⚙️ System & Preferences</h3>
+          <h3 style={{ marginBottom: 'var(--space-4)', fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <SettingsIcon size={20} /> System & Preferences
+          </h3>
           
           <div className="flex flex-col gap-4">
             <label className="flex items-center justify-between" style={{ cursor: 'pointer', padding: 'var(--space-3)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>Notification Sound</div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
-                  Play sound with notifications
+              <div className="flex items-center gap-3">
+                <Volume2 size={18} className="text-secondary" />
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>Notification Sound</div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
+                    Play sound with notifications
+                  </div>
                 </div>
               </div>
               <input
@@ -397,10 +616,104 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Posture Calibration */}
+        <div className="card" style={{ border: '2px solid var(--brand-orange)' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
+            <div style={{
+              padding: 'var(--space-2)',
+              background: 'var(--gradient-orange)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '1.25rem',
+            }}>
+              <Activity size={20} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Personal Posture Baseline</h3>
+          </div>
+          
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
+            Calibrate ErgoSense to learn YOUR ideal posture. This creates a personalized baseline instead of using generic standards.
+          </p>
+
+          <div style={{
+            padding: 'var(--space-4)',
+            background: 'rgba(234, 88, 12, 0.1)',
+            border: '1px solid rgba(234, 88, 12, 0.3)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 'var(--space-4)',
+          }}>
+            <div style={{ fontSize: '0.875rem', lineHeight: 1.6 }}>
+              <div style={{ fontWeight: 600, marginBottom: 'var(--space-2)' }}>✨ How it works:</div>
+              <ul style={{ margin: 0, paddingLeft: 'var(--space-4)', color: 'var(--text-secondary)' }}>
+                <li>Sit in your best posture for 60 seconds</li>
+                <li>ErgoSense measures your shoulder angle, neck position, and distance</li>
+                <li>Future alerts are personalized to YOU</li>
+              </ul>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              if ((window as any).triggerCalibration) {
+                (window as any).triggerCalibration();
+              }
+            }}
+            className="btn"
+            style={{
+              background: 'var(--gradient-orange)',
+              color: 'white',
+              width: '100%',
+              padding: 'var(--space-4)',
+              fontSize: '1rem',
+              fontWeight: 700,
+            }}
+          >
+            <Activity size={20} /> Start Calibration (60s)
+          </button>
+        </div>
+
+        {/* Stretch Guide Testing */}
+        <div className="card" style={{ border: '2px solid #10b981' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
+            <div style={{
+              padding: 'var(--space-2)',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '1.25rem',
+            }}>
+              <Activity size={20} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Stretch Guide Testing</h3>
+          </div>
+          
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
+            Test the micro-stretch animation feature. Normally triggers after 10 minutes of poor posture.
+          </p>
+
+          <button
+            onClick={() => {
+              if ((window as any).triggerStretchGuide) {
+                (window as any).triggerStretchGuide();
+              }
+            }}
+            className="btn"
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              width: '100%',
+              padding: 'var(--space-4)',
+              fontSize: '1rem',
+              fontWeight: 700,
+            }}
+          >
+            <Activity size={20} /> Test Stretch Guide
+          </button>
+        </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-4 justify-end" style={{ marginTop: 'var(--space-8)' }}>
+      {/* These buttons are now replaced by the floating bar, but keeping them commented out for reference if needed */}
+      {/* <div className="flex gap-4 justify-end" style={{ marginTop: 'var(--space-8)' }}>
         <button
           onClick={resetToDefaults}
           className="btn btn-ghost"
@@ -415,9 +728,48 @@ export const Settings: React.FC = () => {
         >
           {saving ? 'Saving...' : '💾 Save Settings'}
         </button>
+      </div> */}
+
+      {/* Floating Action Bar */}
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        left: '50%',
+        transform: `translateX(-50%) translateY(${isDirty ? '0' : '100px'})`,
+        background: 'rgba(17, 24, 39, 0.95)',
+        backdropFilter: 'blur(10px)',
+        padding: 'var(--space-3) var(--space-6)',
+        borderRadius: 'var(--radius-full)',
+        border: '1px solid var(--border-color)',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-4)',
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 100,
+      }}>
+        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          Unsaved changes
+        </div>
+        <div style={{ height: '20px', width: '1px', background: 'var(--border-color)' }} />
+        <button 
+          onClick={handleReset}
+          className="btn btn-ghost btn-sm"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          Reset
+        </button>
+        <button 
+          onClick={saveSettings}
+          className="btn btn-primary btn-sm flex items-center gap-2"
+          disabled={saving || !isDirty}
+        >
+          {saving ? <div className="animate-spin"><RotateCcw size={14} /></div> : <Save size={16} />}
+          Save Changes
+        </button>
       </div>
 
-      {/* Toast Notification */}
+      {/* Success/Error Toast */}
       {message && (
         <div
           style={{
@@ -440,7 +792,7 @@ export const Settings: React.FC = () => {
           }}
         >
           <span style={{ fontSize: '1.5rem' }}>
-            {message.type === 'success' ? '✅' : '❌'}
+            {message.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
           </span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, marginBottom: 'var(--space-1)' }}>
@@ -457,14 +809,16 @@ export const Settings: React.FC = () => {
               border: 'none',
               color: 'white',
               cursor: 'pointer',
-              fontSize: '1.25rem',
               padding: 'var(--space-1)',
               opacity: 0.8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
           >
-            ×
+            <X size={20} />
           </button>
         </div>
       )}

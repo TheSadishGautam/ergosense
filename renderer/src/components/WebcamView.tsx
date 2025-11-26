@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FrameMessage } from '../../../models/types';
 
 const FRAME_RATE = 100; // Capture every 100ms
 
-export const WebcamView = () => {
+export const WebcamView = React.memo(() => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -133,4 +133,4 @@ export const WebcamView = () => {
       </div>
     </div>
   );
-};
+});

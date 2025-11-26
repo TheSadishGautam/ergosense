@@ -29,11 +29,14 @@ Sentry.init({
 process.env.DIST = path.join(__dirname, '../dist');
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirname, '../public');
 
+import { BreakManager } from './services/BreakManager';
+
 let win: BrowserWindow | null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
 const mlEngine = new MLEngine();
+const breakManager = new BreakManager(mlEngine.getStore());
 
 function createTray() {
   const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png'); // Dev path
@@ -155,19 +158,39 @@ app.whenReady().then(() => {
   createTray();
 
   // Setup IPC handlers
+  let isProcessingFrame = false;
+
   ipcMain.on(IPC_CHANNELS.SEND_FRAME, async (event, frame: FrameMessage) => {
-    // Process frame
-    const result = await mlEngine.processFrame(frame);
+    if (isProcessingFrame) return; // Drop frame if busy
     
-    // Send update back to renderer
-    if (win && !win.isDestroyed()) {
-      win.webContents.send(IPC_CHANNELS.LIVE_STATE_UPDATE, result);
+    isProcessingFrame = true;
+    try {
+      // Process frame
+      const result = await mlEngine.processFrame(frame);
+      
+      // Send update back to renderer
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.LIVE_STATE_UPDATE, result);
+      }
+    } catch (error) {
+      console.error('Error processing frame:', error);
+    } finally {
+      isProcessingFrame = false;
     }
   });
 
   ipcMain.handle(IPC_CHANNELS.GET_METRICS, (event, type: string, timeWindowMs: number) => {
     return mlEngine.getStore().getMetrics(type, timeWindowMs);
   });
+
+  ipcMain.handle('get-zone-metrics', (event, timeWindowMs: number) => {
+    return mlEngine.getStore().getZoneMetrics(timeWindowMs);
+  });
+
+  ipcMain.handle('get-monitor-metrics', (event, timeWindowMs: number) => {
+    return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
+  });
+
 
   // Notification settings handlers
   ipcMain.handle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
@@ -195,7 +218,17 @@ app.whenReady().then(() => {
       openAtLogin: enable,
       openAsHidden: true, // Optional: start hidden
     });
-    return app.getLoginItemSettings().openAtLogin;
+    return true;
+  });
+
+  // System Stats Handler
+  ipcMain.handle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
+    const memory = await process.getProcessMemoryInfo();
+    const cpu = process.getCPUUsage();
+    return {
+      memory: Math.round(memory.private / 1024), // Convert KB to MB
+      cpu: cpu.percentCPUUsage
+    };
   });
 
   ipcMain.handle(IPC_CHANNELS.GET_APP_SETTING, (event, key: string) => {
@@ -205,5 +238,70 @@ app.whenReady().then(() => {
   ipcMain.handle(IPC_CHANNELS.SET_APP_SETTING, (event, key: string, value: any) => {
     mlEngine.getStore().setAppSetting(key, value);
     return true;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.START_CALIBRATION, async () => {
+    mlEngine.startCalibration();
+    return;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
+    return mlEngine.getStore().getPostureBaseline();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
+    mlEngine.getStore().setPostureBaseline(baseline);
+    return;
+  });
+
+  // Break Management Handlers
+  ipcMain.handle('get-break-settings', () => {
+    return breakManager.getSettings();
+  });
+
+  ipcMain.handle('update-break-settings', (event, settings) => {
+    breakManager.updateSettings(settings);
+    return true;
+  });
+
+  ipcMain.handle('snooze-break', () => {
+    breakManager.snoozeBreak(10);
+    return true;
+  });
+
+  ipcMain.handle('skip-break', () => {
+    breakManager.skipBreak();
+    return true;
+  });
+
+  ipcMain.handle('start-break', () => {
+    breakManager.startBreak();
+    return true;
+  });
+
+  ipcMain.handle('end-break', (event, postBreakStrain) => {
+    breakManager.endBreak(postBreakStrain);
+    return true;
+  });
+
+  ipcMain.handle('get-break-stats', (event, days) => {
+    return mlEngine.getStore().getBreakStats(days || 7);
+  });
+
+  ipcMain.handle('get-time-until-break', () => {
+    return breakManager.getTimeUntilNextBreak();
+  });
+
+  // Connect BreakManager events to renderer
+  breakManager.on('countdown-update', (data) => {
+    win?.webContents.send('break-countdown-update', data);
+  });
+
+  breakManager.on('break-due', (data) => {
+    win?.webContents.send('break-due', data);
+  });
+
+  breakManager.on('break-warning', (data) => {
+    win?.webContents.send('break-warning', data);
   });
 });

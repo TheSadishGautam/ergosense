@@ -1,7 +1,7 @@
-import { FrameMessage, LiveState } from '../../models/types';
+import { FrameMessage, LiveState, PostureBaseline, PostureZone } from '../../models/types';
 import { PoseModel } from './poseModel';
 import { FaceModel } from './faceModel';
-import { calculatePostureMetrics, calculateEyeMetrics } from './analysis';
+import { calculatePostureMetrics, calculateEyeMetrics, detectPostureZone, calculateHeadDirection } from './analysis';
 import { MetricStore } from '../db/store';
 import { NotificationManager } from '../services/NotificationManager';
 
@@ -41,6 +41,34 @@ export class MLEngine {
   // Notification Manager
   private notificationManager: NotificationManager;
 
+  // Calibration state
+  private isCalibrating: boolean = false;
+  private calibrationData: {
+    shoulderAngles: number[];
+    neckAngles: number[];
+    headTilts: number[];
+    distances: number[];
+  } = { shoulderAngles: [], neckAngles: [], headTilts: [], distances: [] };
+  private calibrationStartTime: number = 0;
+  private readonly CALIBRATION_DURATION_MS = 60000; // 60 seconds
+
+  // Zone tracking
+  private zoneDistribution: Map<PostureZone, number> = new Map();
+  private lastZoneFlushTime: number = Date.now();
+  private readonly ZONE_FLUSH_INTERVAL = 60 * 1000; // 1 minute
+
+  // Monitor gaze tracking
+  private monitorGazeDistribution: Map<string, number> = new Map([
+    ['CENTER', 0],
+    ['LEFT', 0],
+    ['RIGHT', 0]
+  ]);
+  private lastMonitorPosition: string | null = null;
+  private monitorSwitches: number = 0;
+  private lastMonitorFlushTime: number = Date.now();
+  private readonly MONITOR_FLUSH_INTERVAL = 60 * 1000; // 1 minute
+
+
   constructor() {
     this.poseModel = new PoseModel();
     this.poseModel.load();
@@ -63,7 +91,20 @@ export class MLEngine {
     const faceLandmarks = await this.faceModel.estimateFace(frame, keypoints);
     
     if (keypoints.length > 0) {
+      // Process calibration data if calibrating
+      this.processCalibrationData(keypoints);
+      
       const { postureScore, postureState } = calculatePostureMetrics(keypoints);
+      
+      // Detect posture zone
+      const { zone } = detectPostureZone(keypoints);
+      this.trackZone(zone);
+      
+      // Detect head direction for multi-monitor awareness
+      const { direction, confidence } = calculateHeadDirection(keypoints);
+      if (confidence > 0.5) {
+        this.trackMonitorGaze(direction);
+      }
       
       this.lastState = {
         ...this.lastState,
@@ -311,7 +352,111 @@ export class MLEngine {
       this.flushMetrics();
       this.lastFlushTime = now;
     }
+    
+    // Also check zone flush
+    if (now - this.lastZoneFlushTime > this.ZONE_FLUSH_INTERVAL) {
+      this.flushZoneData();
+      this.lastZoneFlushTime = now;
+    }
+    
+    // Also check monitor flush
+    if (now - this.lastMonitorFlushTime > this.MONITOR_FLUSH_INTERVAL) {
+      this.flushMonitorData();
+      this.lastMonitorFlushTime = now;
+    }
   }
+
+  private trackZone(zone: PostureZone) {
+    const current = this.zoneDistribution.get(zone) || 0;
+    this.zoneDistribution.set(zone, current + 1);
+    
+    // Flush zone data periodically
+    const now = Date.now();
+    if (now - this.lastZoneFlushTime >= this.ZONE_FLUSH_INTERVAL) {
+      this.flushZoneData();
+      this.lastZoneFlushTime = now;
+    }
+  }
+
+  private trackMonitorGaze(position: string) {
+    // Track time in each position
+    const current = this.monitorGazeDistribution.get(position) || 0;
+    this.monitorGazeDistribution.set(position, current + 1);
+    
+    // Track switches (when position changes)
+    if (this.lastMonitorPosition && this.lastMonitorPosition !== position) {
+      this.monitorSwitches++;
+    }
+    this.lastMonitorPosition = position;
+    
+    // Flush monitor data periodically
+    const now = Date.now();
+    if (now - this.lastMonitorFlushTime >= this.MONITOR_FLUSH_INTERVAL) {
+      this.flushMonitorData();
+      this.lastMonitorFlushTime = now;
+    }
+  }
+
+  private flushZoneData() {
+    if (this.zoneDistribution.size === 0) return;
+
+    // Calculate total samples
+    let total = 0;
+    this.zoneDistribution.forEach(count => total += count);
+
+    if (total === 0) return;
+
+    // Store zone distribution in database
+    const zoneData: any = {};
+    this.zoneDistribution.forEach((count, zone) => {
+      zoneData[zone] = {
+        count,
+        percentage: (count / total) * 100
+      };
+    });
+
+    this.db.addMetric('ZONE', total, zoneData);
+    
+    console.log('Flushed zone distribution:', zoneData);
+    
+    // Reset distribution for next interval
+    this.zoneDistribution.clear();
+  }
+
+  private flushMonitorData() {
+    if (this.monitorGazeDistribution.size === 0) return;
+
+    // Calculate total samples
+    let total = 0;
+    this.monitorGazeDistribution.forEach(count => total += count);
+
+    if (total === 0) return;
+
+    // Store monitor gaze distribution in database
+    const monitorData: any = {
+      center: this.monitorGazeDistribution.get('CENTER') || 0,
+      left: this.monitorGazeDistribution.get('LEFT') || 0,
+      right: this.monitorGazeDistribution.get('RIGHT') || 0,
+      switches: this.monitorSwitches,
+      total,
+    };
+
+    // Calculate percentages
+    monitorData.centerPercentage = (monitorData.center / total) * 100;
+    monitorData.leftPercentage = (monitorData.left / total) * 100;
+    monitorData.rightPercentage = (monitorData.right / total) * 100;
+
+    this.db.addMetric('MONITOR_GAZE', total, monitorData);
+    
+    console.log('Flushed monitor gaze distribution:', monitorData);
+    
+    // Reset for next interval
+    this.monitorGazeDistribution.set('CENTER', 0);
+    this.monitorGazeDistribution.set('LEFT', 0);
+    this.monitorGazeDistribution.set('RIGHT', 0);
+    this.monitorSwitches = 0;
+  }
+
 
   private flushMetrics() {
     // Calculate averages
@@ -352,4 +497,101 @@ export class MLEngine {
     this.eyeStrainScoreBuffer = [];
     this.blinkCountInInterval = 0;
   }
+
+  public startCalibration() {
+    console.log('Starting posture calibration...');
+    this.isCalibrating = true;
+    this.calibrationStartTime = Date.now();
+    this.calibrationData = {
+      shoulderAngles: [],
+      neckAngles: [],
+      headTilts: [],
+      distances: [],
+    };
+  }
+
+  private processCalibrationData(keypoints: any[]) {
+    if (!this.isCalibrating) return;
+
+    const elapsed = Date.now() - this.calibrationStartTime;
+    
+    // Check if calibration is complete
+    if (elapsed >= this.CALIBRATION_DURATION_MS) {
+      this.completeCalibration();
+      return;
+    }
+
+    // Extract calibration metrics from keypoints
+    const { neckAngle } = calculatePostureMetrics(keypoints);
+    
+    // Calculate shoulder angle and head tilt from keypoints
+    const leftShoulder = keypoints[5]; // LEFT_SHOULDER
+    const rightShoulder = keypoints[6]; // RIGHT_SHOULDER
+    const leftEar = keypoints[3]; // LEFT_EAR
+    const rightEar = keypoints[4]; // RIGHT_EAR
+    
+    if (leftShoulder && rightShoulder && leftShoulder.score > 0.3 && rightShoulder.score > 0.3) {
+      const shoulderAngle = Math.atan2(
+        rightShoulder.y - leftShoulder.y,
+        rightShoulder.x - leftShoulder.x
+      ) * (180 / Math.PI);
+      this.calibrationData.shoulderAngles.push(shoulderAngle);
+    }
+
+    if (leftEar && rightEar && leftEar.score > 0.3 && rightEar.score > 0.3) {
+      const headTilt = Math.atan2(
+        rightEar.y - leftEar.y,
+        rightEar.x - leftEar.x
+      ) * (180 / Math.PI);
+      this.calibrationData.headTilts.push(headTilt);
+    }
+
+    this.calibrationData.neckAngles.push(neckAngle);
+    
+    // Estimate distance (simplified - could be enhanced with more sophisticated algorithm)
+    const shoulderWidth = leftShoulder && rightShoulder 
+      ? Math.abs(leftShoulder.x - rightShoulder.x) 
+      : 0;
+    if (shoulderWidth > 0) {
+      // Assume average shoulder width ~45cm, estimate distance based on pixel width
+      const estimatedDistance = (45 * 640) / (shoulderWidth * 640); // rough estimate
+      this.calibrationData.distances.push(Math.min(100, Math.max(30, estimatedDistance)));
+    }
+  }
+
+  private completeCalibration() {
+    console.log('Completing calibration...');
+    this.isCalibrating = false;
+
+    // Calculate averages
+    const avgShoulder = this.calibrationData.shoulderAngles.length > 0
+      ? this.calibrationData.shoulderAngles.reduce((a, b) => a + b, 0) / this.calibrationData.shoulderAngles.length
+      : 0;
+    
+    const avgNeck = this.calibrationData.neckAngles.length > 0
+      ? this.calibrationData.neckAngles.reduce((a, b) => a + b, 0) / this.calibrationData.neckAngles.length
+      : 0;
+    
+    const avgHeadTilt = this.calibrationData.headTilts.length > 0
+      ? this.calibrationData.headTilts.reduce((a, b) => a + b, 0) / this.calibrationData.headTilts.length
+      : 0;
+    
+    const avgDistance = this.calibrationData.distances.length > 0
+      ? this.calibrationData.distances.reduce((a, b) => a + b, 0) / this.calibrationData.distances.length
+      : 60; // default 60cm
+
+    const baseline: PostureBaseline = {
+      timestamp: Date.now(),
+      shoulderAngle: avgShoulder,
+      neckAngle: avgNeck,
+      headTilt: avgHeadTilt,
+      distanceCm: avgDistance,
+      samples: this.calibrationData.neckAngles.length,
+    };
+
+    // Save to database
+    this.db.setPostureBaseline(baseline);
+    console.log('Calibration complete:', baseline);
+  }
 }
+

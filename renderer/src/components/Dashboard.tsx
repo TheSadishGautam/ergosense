@@ -1,42 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell
 } from 'recharts';
+import { 
+  Activity, Eye, Zap, TrendingUp, Clock, Calendar, 
+  BarChart2, PieChart as PieChartIcon, Monitor, RotateCcw, LayoutGrid, CheckCircle 
+} from 'lucide-react';
 import { useMetrics, TimeRange } from '../hooks/useMetrics';
 import { MetricCard } from './MetricCard';
 import { TimeRangeSelector } from './TimeRangeSelector';
+import { PostureHeatmap } from './PostureHeatmap';
+import { MultiMonitorStats } from './MultiMonitorStats';
+import { CustomTooltip } from './CustomTooltip';
 import { formatTime, aggregateByHour } from '../utils/chartHelpers';
 import { getPostureStatus, getEyeStatus, getBlinkStatus } from '../utils/statusHelpers';
 import { COLORS } from '../utils/theme';
 
-export const Dashboard: React.FC = () => {
+// Time windows mapping
+const timeWindows: Record<TimeRange, number> = {
+  '30M': 30 * 60 * 1000,
+  '1H': 60 * 60 * 1000,
+  '6H': 6 * 60 * 60 * 1000,
+  '24H': 24 * 60 * 60 * 1000,
+  '7D': 7 * 24 * 60 * 60 * 1000,
+  '30D': 30 * 24 * 60 * 60 * 1000,
+};
+
+export const Dashboard: React.FC = React.memo(() => {
   const [timeRange, setTimeRange] = useState<TimeRange>('24H');
   const { data, derived, loading, lastUpdated } = useMetrics(timeRange);
+  const [zoneData, setZoneData] = useState<any[]>([]);
+
+  // Fetch zone data when time range changes
+  useEffect(() => {
+    const fetchZoneData = async () => {
+      try {
+        const zones = await window.electronAPI.getZoneMetrics(timeWindows[timeRange]);
+        setZoneData(zones || []);
+      } catch (err) {
+        console.error('Failed to fetch zone data:', err);
+      }
+    };
+    fetchZoneData();
+  }, [timeRange, timeWindows]);
 
   // Calculate ergonomic score (composite metric)
-  const ergonomicScore = derived.avgPosture * 0.4 + (1 - derived.avgEyeStrain) * 0.4 + 
-    (Math.min(derived.avgBlinks / 15, 1)) * 0.2;
+  const ergonomicScore = React.useMemo(() => 
+    derived.avgPosture * 0.4 + (1 - derived.avgEyeStrain) * 0.4 + 
+    (Math.min(derived.avgBlinks / 15, 1)) * 0.2,
+    [derived]
+  );
 
   // Prepare combined chart data
-  const combinedData = data.posture.map((p, i) => ({
+  const combinedData = React.useMemo(() => data.posture.map((p, i) => ({
     timestamp: p.timestamp,
     posture: p.value,
     eyeStrain: data.eye[i]?.value || 0,
-  }));
+  })), [data.posture, data.eye]);
 
   // Posture distribution
-  // Posture distribution
-  const postureDistribution = [
+  const postureDistribution = React.useMemo(() => [
     { name: 'Excellent', value: data.posture.filter(p => p.value >= 0.85).length, color: COLORS.excellent },
     { name: 'Good', value: data.posture.filter(p => p.value >= 0.7 && p.value < 0.85).length, color: COLORS.good },
     { name: 'Fair', value: data.posture.filter(p => p.value >= 0.4 && p.value < 0.7).length, color: COLORS.warning },
     { name: 'Poor', value: data.posture.filter(p => p.value < 0.4).length, color: COLORS.danger },
-  ];
+  ], [data.posture]);
 
   // Hourly heatmap data
-  const hourlyData = aggregateByHour(data.posture);
+  const hourlyData = React.useMemo(() => aggregateByHour(data.posture), [data.posture]);
 
   if (loading) {
     return (
@@ -47,7 +80,8 @@ export const Dashboard: React.FC = () => {
         minHeight: '400px',
         color: 'var(--text-secondary)' 
       }}>
-        <div className="animate-pulse">Loading dashboard...</div>
+        <div className="animate-spin" style={{ marginRight: 'var(--space-2)' }}><RotateCcw size={24} /></div>
+        <div>Loading dashboard...</div>
       </div>
     );
   }
@@ -82,10 +116,10 @@ export const Dashboard: React.FC = () => {
                 padding: 'var(--space-3)',
                 background: 'var(--gradient-orange)',
                 borderRadius: 'var(--radius-lg)',
-                fontSize: '1.5rem',
                 boxShadow: '0 4px 12px rgba(234, 88, 12, 0.4)',
+                color: 'white'
               }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                <LayoutGrid size={32} />
               </div>
               <h1 style={{ 
                 margin: 0,
@@ -104,81 +138,96 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-3 gap-4" style={{ marginBottom: 'var(--space-8)' }}>
-        <div style={{ animation: 'slideUp 0.5s ease forwards', animationDelay: '0.1s', opacity: 0 }}>
+      {/* Key Metrics Grid - Premium Cards */}
+      <div style={{ 
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 'var(--space-6)',
+        marginBottom: 'var(--space-8)',
+      }}>
+        <div className="card-glass" style={{ animation: 'none' }}>
           <MetricCard
             title="Posture Score"
             value={(derived.avgPosture * 100).toFixed(0)}
             unit="%"
             trend={derived.postureTrend}
             status={getPostureStatus(derived.avgPosture)}
-            icon="🧍"
+            icon={<Activity />}
             subtitle="Average posture quality"
           />
         </div>
-        <div style={{ animation: 'slideUp 0.5s ease forwards', animationDelay: '0.2s', opacity: 0 }}>
+        <div className="card-glass" style={{ animation: 'none' }}>
           <MetricCard
             title="Eye Strain"
             value={(derived.avgEyeStrain * 100).toFixed(0)}
             unit="%"
             trend={derived.eyeTrend}
             status={getEyeStatus(derived.avgEyeStrain)}
-            icon="👁️"
+            icon={<Eye />}
             subtitle="Eye fatigue level"
           />
         </div>
-        <div style={{ animation: 'slideUp 0.5s ease forwards', animationDelay: '0.3s', opacity: 0 }}>
+        <div className="card-glass" style={{ animation: 'none' }}>
           <MetricCard
             title="Blink Rate"
             value={derived.avgBlinks.toFixed(0)}
             unit="/min"
             trend={derived.blinkTrend}
             status={getBlinkStatus(derived.avgBlinks)}
-            icon="✨"
+            icon={<Zap />}
             subtitle="Blinks per minute"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4" style={{ marginBottom: 'var(--space-8)' }}>
-        <div style={{ animation: 'slideUp 0.5s ease forwards', animationDelay: '0.4s', opacity: 0 }}>
+      {/* Secondary Metrics */}
+      <div style={{ 
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 'var(--space-4)',
+        marginBottom: 'var(--space-8)',
+      }}>
+        <div className="card-glass" style={{ animation: 'none' }}>
           <MetricCard
             title="Ergonomic Score"
             value={(ergonomicScore * 100).toFixed(0)}
             unit="/100"
             status={ergonomicScore >= 0.85 ? 'excellent' : ergonomicScore >= 0.7 ? 'good' : ergonomicScore >= 0.5 ? 'warning' : 'danger'}
-            icon="🎯"
+            icon={<Activity />}
             subtitle="Overall health index"
           />
         </div>
-        <div style={{ animation: 'slideUp 0.5s ease forwards', animationDelay: '0.5s', opacity: 0 }}>
+        <div className="card-glass" style={{ animation: 'none' }}>
           <MetricCard
             title="Focus Time"
             value={derived.totalPresenceMinutes}
             unit="min"
-            icon="⏱️"
+            icon={<Clock />}
             subtitle="Active time detected"
             status="excellent"
           />
         </div>
-        <div style={{ animation: 'slideUp 0.5s ease forwards', animationDelay: '0.6s', opacity: 0 }}>
+        <div className="card-glass" style={{ animation: 'none' }}>
           <MetricCard
             title="Time Range"
             value={timeRange}
-            icon="📅"
+            icon={<Calendar />}
             subtitle="Time range displayed"
           />
         </div>
       </div>
 
-      {/* Main Charts Section */}
-      <div className="grid grid-cols-2 gap-6" style={{ marginBottom: 'var(--space-8)' }}>
+      {/* Charts Grid - Premium Layout */}
+      <div style={{ 
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 'var(--space-6)',
+        marginBottom: 'var(--space-8)',
+      }}>
         {/* Dual-Axis Chart: Posture + Eye Strain */}
-        <div className="card" style={{ 
-          background: 'var(--gradient-card)',
-          border: '1px solid rgba(168, 85, 247, 0.2)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+        <div className="card-glass" style={{ 
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          position: 'relative',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-4px)';
@@ -189,6 +238,15 @@ export const Dashboard: React.FC = () => {
           e.currentTarget.style.boxShadow = '';
         }}
         >
+          {/* Blue accent line */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)',
+          }} />
           <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
             <div style={{
               padding: 'var(--space-2)',
@@ -199,7 +257,7 @@ export const Dashboard: React.FC = () => {
             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)'}
             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
             >
-              <span style={{ fontSize: '1.25rem' }}>📈</span>
+              <TrendingUp size={20} />
             </div>
             <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Posture & Eye Strain Trends</h3>
           </div>
@@ -227,7 +285,7 @@ export const Dashboard: React.FC = () => {
                 stroke="var(--text-tertiary)"
                 style={{ fontSize: '0.75rem' }}
               />
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
               <Legend />
               <Area 
                 type="monotone" 
@@ -252,10 +310,9 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Blink Frequency */}
-        <div className="card" style={{ 
-          background: 'var(--gradient-card)',
-          border: '1px solid rgba(168, 85, 247, 0.2)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+        <div className="card-glass" style={{ 
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          position: 'relative',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-4px)';
@@ -266,6 +323,15 @@ export const Dashboard: React.FC = () => {
           e.currentTarget.style.boxShadow = '';
         }}
         >
+          {/* Blue accent line */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)',
+          }} />
           <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
             <div style={{
               padding: 'var(--space-2)',
@@ -276,7 +342,7 @@ export const Dashboard: React.FC = () => {
             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)'}
             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
             >
-              <span style={{ fontSize: '1.25rem' }}>✨</span>
+              <Zap size={20} />
             </div>
             <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Blink Frequency</h3>
           </div>
@@ -293,7 +359,7 @@ export const Dashboard: React.FC = () => {
                 stroke="var(--text-tertiary)"
                 style={{ fontSize: '0.75rem' }}
               />
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
               <Legend />
               <Bar 
                 dataKey="value" 
@@ -312,8 +378,12 @@ export const Dashboard: React.FC = () => {
             fontSize: '0.875rem',
             color: '#fb923c',
             textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'var(--space-2)',
           }}>
-            💡 Target: 12-20 blinks per minute
+            <Zap size={16} /> Target: 12-20 blinks per minute
           </div>
         </div>
       </div>
@@ -321,10 +391,9 @@ export const Dashboard: React.FC = () => {
       {/* Secondary Charts */}
       <div className="grid grid-cols-2 gap-6" style={{ marginBottom: 'var(--space-8)' }}>
         {/* Posture Distribution */}
-        <div className="card" style={{ 
-          background: 'var(--gradient-card)',
-          border: '1px solid rgba(168, 85, 247, 0.2)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+        <div className="card-glass" style={{ 
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          position: 'relative',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-4px)';
@@ -365,7 +434,7 @@ export const Dashboard: React.FC = () => {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -413,7 +482,7 @@ export const Dashboard: React.FC = () => {
                 stroke="var(--text-tertiary)"
                 style={{ fontSize: '0.75rem' }}
               />
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
               <Line 
                 type="monotone" 
                 dataKey="value" 
@@ -453,8 +522,9 @@ export const Dashboard: React.FC = () => {
             borderRadius: 'var(--radius-lg)',
             fontSize: '1.5rem',
             boxShadow: '0 4px 12px rgba(234, 88, 12, 0.4)',
+            color: 'white'
           }}>
-            💡
+            <Zap size={24} />
           </div>
           <h3 style={{ fontSize: '1.5rem', margin: 0, fontWeight: 800 }}>Insights & Recommendations</h3>
         </div>
@@ -470,13 +540,64 @@ export const Dashboard: React.FC = () => {
           <div>
             <h4 style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: 'var(--space-2)' }}>Action Items</h4>
             <ul style={{ listStyle: 'none', padding: 0, fontSize: '0.875rem', lineHeight: 1.8 }}>
-              <li>✅ Follow 20-20-20 rule (every 20 min, look 20 ft away for 20 sec)</li>
-              <li>✅ Adjust monitor to eye level</li>
-              <li>✅ Take micro-breaks every hour</li>
+              <li className="flex items-center gap-2"><CheckCircle size={14} className="text-success" /> Follow 20-20-20 rule (every 20 min, look 20 ft away for 20 sec)</li>
+              <li className="flex items-center gap-2"><CheckCircle size={14} className="text-success" /> Adjust monitor to eye level</li>
+              <li className="flex items-center gap-2"><CheckCircle size={14} className="text-success" /> Take micro-breaks every hour</li>
             </ul>
           </div>
+        </div>
+
+        {/* Posture Zone Heatmap */}
+        <div className="card" style={{
+          background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%)',
+          border: '1px solid rgba(234, 88, 12, 0.3)',
+          color: 'white',
+          boxShadow: '0 4px 20px rgba(234, 88, 12, 0.2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+            <div style={{
+              padding: 'var(--space-2)',
+              background: 'var(--gradient-orange)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '1.25rem',
+              color: 'white'
+            }}>
+              <Activity size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Posture Zone Heatmap</h3>
+          </div>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
+            Where does your head spend most of its time?
+          </p>
+          <PostureHeatmap zoneData={zoneData} />
+        </div>
+
+        {/* Multi-Monitor Usage */}
+        <div className="card" style={{
+          background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%)',
+          border: '1px solid rgba(234, 88, 12, 0.3)',
+          color: 'white',
+          boxShadow: '0 4px 20px rgba(234, 88, 12, 0.2)',
+          marginTop: 'var(--space-6)', // Added margin to separate from heatmap
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+            <div style={{
+              padding: 'var(--space-2)',
+              background: 'var(--gradient-orange)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '1.25rem',
+              color: 'white'
+            }}>
+              <Monitor size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Multi-Monitor Usage</h3>
+          </div>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
+            How much time do you spend looking at each monitor?
+          </p>
+          <MultiMonitorStats timeRange={timeWindows[timeRange]} />
         </div>
       </div>
     </div>
   );
-};
+});
