@@ -7,6 +7,9 @@ files:
   - dist-electron/**/*
 asarUnpack:
   - resources/**
+  - "**/*.node"
+  - "**/node_modules/onnxruntime-node/**"
+  - "**/node_modules/better-sqlite3/**"
 extraResources:
   - resources/**
 mac:
@@ -14,7 +17,7 @@ mac:
     - dmg
     - zip
   icon: build/icon.png
-  identity: null
+
   category: public.app-category.healthcare-fitness
   files:
     - "dist/**/*"
@@ -52,4 +55,4 @@ linux:
 publish:
   provider: github
   owner: TheSadishGautam
-  repo: ErgoSense-releases
+  repo: ergosense
