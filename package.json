@@ -1,6 +1,6 @@
 {
   "name": "ergosense",
-  "version": "0.1.9",
+  "version": "0.2.1",
   "description": "A cross-platform desktop ergonomics assistant",
   "main": "dist-electron/main.js",
   "scripts": {
