@@ -38,6 +38,13 @@ win:
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**"
     - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  license: LICENSE.md
+  include: build/installer.nsh
+  deleteAppDataOnUninstall: true
 linux:
   target:
     - AppImage
