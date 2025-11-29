@@ -55,4 +55,4 @@ linux:
 publish:
   provider: github
   owner: TheSadishGautam
-  repo: ergosense
+  repo: ErgoSense-releases
