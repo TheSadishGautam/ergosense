@@ -1,4 +1,4 @@
-# ErgoSense-releases
+# ErgoSense
 
 Welcome to the official **ErgoSense** Releases repository! This is your destination for downloading the latest builds of **Your Personal AI-Powered Ergonomics Assistant** across all major platforms.
 
@@ -8,7 +8,7 @@ Whether you're a remote worker, software developer, digital creative, or anyone 
 
 ## Overview
 
-ErgoSense-releases serves as the primary distribution channel for stable and tested versions of the ErgoSense desktop application. Rather than compiling from source code, users can directly download pre-built binaries optimized for their specific platform. This approach ensures faster deployment, reduced setup complexity, and guaranteed compatibility across different systems.
+ErgoSense serves as the primary distribution channel for stable and tested versions of the ErgoSense desktop application. Rather than compiling from source code, users can directly download pre-built binaries optimized for their specific platform. This approach ensures faster deployment, reduced setup complexity, and guaranteed compatibility across different systems.
 
 The repository is meticulously maintained to provide clean, organized, and easily accessible releases. Each build is carefully prepared and tested before being made available for public download, ensuring that users receive high-quality, production-ready software.
 
@@ -57,7 +57,7 @@ Experience ErgoSense online and explore its full capabilities:
 
 ## Repository Contents
 
-ErgoSense-releases contains professionally prepared build files and installers for ErgoSense. All major platforms are now supported:
+ErgoSense contains professionally prepared build files and installers for ErgoSense. All major platforms are now supported:
 
 ### Available Platforms
 

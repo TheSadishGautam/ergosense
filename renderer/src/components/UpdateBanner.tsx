@@ -6,7 +6,7 @@ interface UpdateBannerProps {
 
 export const UpdateBanner: React.FC<UpdateBannerProps> = ({ onDismiss }) => {
   const handleDownload = () => {
-    window.open('https://github.com/TheSadishGautam/ErgoSense-releases/releases/latest', '_blank');
+    window.open('https://github.com/TheSadishGautam/ErgoSense/releases/latest', '_blank');
   };
 
   return (
