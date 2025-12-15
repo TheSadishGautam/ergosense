@@ -1,6 +1,9 @@
 node_modules
 dist
 dist-electron
+dist-electron/main.js
+dist-electron/preload.js
+dist-electron/renderer.js
 release
 .DS_Store
 .env

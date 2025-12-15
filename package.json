@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
-    "build:mac": "tsc && vite build && PYTHON=/opt/homebrew/opt/python@3.11/bin/python3.11 electron-builder --mac",
+    "build:mac": "tsc && vite build && electron-builder --mac",
     "build:win": "tsc && vite build && electron-builder --win",
     "build:linux": "tsc && vite build && electron-builder --linux",
     "build:all": "tsc && vite build && electron-builder --mac --win --linux",
