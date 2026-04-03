@@ -95,8 +95,14 @@ function App() {
       {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
       {showCalibration && <CalibrationView onComplete={handleCalibrationComplete} onCancel={() => setShowCalibration(false)} />}
       {showStretchGuide && <StretchGuide onComplete={completeStretchGuide} onSnooze={snoozeStretchGuide} onDismiss={dismissStretchGuide} />}
-      {view === 'LIVE' ? (
-        <section id="panel-live" role="tabpanel" aria-labelledby="tab-live" className="animate-fadeIn">
+      <section
+        id="panel-live"
+        role="tabpanel"
+        aria-labelledby="tab-live"
+        aria-hidden={view !== 'LIVE'}
+        style={{ display: view === 'LIVE' ? 'block' : 'none' }}
+        className="animate-fadeIn"
+      >
           <div
             style={{
               maxWidth: '1200px',
@@ -169,16 +175,25 @@ function App() {
               </div>
             </div>
           </div>
-        </section>
-      ) : view === 'DASHBOARD' ? (
-        <section id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
-          <Dashboard />
-        </section>
-      ) : (
-        <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
-          <Settings onOpenCalibration={() => setShowCalibration(true)} onOpenStretchGuide={openStretchGuide} />
-        </section>
-      )}
+      </section>
+      <section
+        id="panel-dashboard"
+        role="tabpanel"
+        aria-labelledby="tab-dashboard"
+        aria-hidden={view !== 'DASHBOARD'}
+        style={{ display: view === 'DASHBOARD' ? 'block' : 'none' }}
+      >
+        <Dashboard />
+      </section>
+      <section
+        id="panel-settings"
+        role="tabpanel"
+        aria-labelledby="tab-settings"
+        aria-hidden={view !== 'SETTINGS'}
+        style={{ display: view === 'SETTINGS' ? 'block' : 'none' }}
+      >
+        <Settings onOpenCalibration={() => setShowCalibration(true)} onOpenStretchGuide={openStretchGuide} />
+      </section>
 
       {showBreakCountdown && view === 'LIVE' && (
         <BreakCountdown

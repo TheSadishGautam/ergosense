@@ -53,12 +53,28 @@ export const Dashboard: React.FC = React.memo(() => {
     [derived]
   );
 
-  // Prepare combined chart data
-  const combinedData = React.useMemo(() => data.posture.map((p, i) => ({
-    timestamp: p.timestamp,
-    posture: p.value,
-    eyeStrain: data.eye[i]?.value || 0,
-  })), [data.posture, data.eye]);
+  // Prepare combined chart data by aligned timestamp buckets to avoid index mismatch.
+  const combinedData = React.useMemo(() => {
+    const bucketMs = 60_000;
+    const postureByBucket = new Map<number, number>();
+    const eyeByBucket = new Map<number, number>();
+
+    data.posture.forEach((sample) => {
+      postureByBucket.set(Math.floor(sample.timestamp / bucketMs), sample.value);
+    });
+    data.eye.forEach((sample) => {
+      eyeByBucket.set(Math.floor(sample.timestamp / bucketMs), sample.value);
+    });
+
+    const allBuckets = new Set<number>([...postureByBucket.keys(), ...eyeByBucket.keys()]);
+    return [...allBuckets]
+      .sort((a, b) => a - b)
+      .map((bucket) => ({
+        timestamp: bucket * bucketMs,
+        posture: postureByBucket.get(bucket) ?? 0,
+        eyeStrain: eyeByBucket.get(bucket) ?? 0,
+      }));
+  }, [data.posture, data.eye]);
 
   // Posture distribution
   const postureDistribution = React.useMemo(() => [

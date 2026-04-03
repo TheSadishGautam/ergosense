@@ -36865,6 +36865,42 @@ let tray = null;
 let isQuitting = false;
 const mlEngine = new MLEngine();
 const breakManager = new BreakManager(mlEngine.getStore());
+const getTrustedRendererOrigins = () => {
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  if (devUrl) {
+    try {
+      return [new URL(devUrl).origin];
+    } catch {
+      return [];
+    }
+  }
+  return ["file://"];
+};
+const isTrustedSender = (event) => {
+  var _a;
+  const senderUrl = ((_a = event.senderFrame) == null ? void 0 : _a.url) || "";
+  if (!senderUrl) return false;
+  if (electron.app.isPackaged) {
+    return senderUrl.startsWith("file://");
+  }
+  const trustedOrigins = getTrustedRendererOrigins();
+  try {
+    const origin = new URL(senderUrl).origin;
+    return trustedOrigins.includes(origin);
+  } catch {
+    return senderUrl.startsWith("file://");
+  }
+};
+const assertTrustedSender = (event) => {
+  if (isTrustedSender(event)) return;
+  throw new Error("Rejected IPC from untrusted renderer origin");
+};
+const safeHandle = (channel, handler) => {
+  electron.ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedSender(event);
+    return handler(event, ...args);
+  });
+};
 function createTray() {
   const iconPath = path$q.join(__dirname, "../renderer/src/assets/icon.png");
   const icon = electron.nativeImage.createFromPath(iconPath);
@@ -36928,10 +36964,24 @@ function createWindow() {
     win == null ? void 0 : win.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info2);
   });
   win.webContents.setWindowOpenHandler(({ url: url2 }) => {
-    if (url2.startsWith("https:")) {
-      require("electron").shell.openExternal(url2);
+    try {
+      const parsed2 = new URL(url2);
+      if (parsed2.protocol === "https:") {
+        electron.shell.openExternal(url2);
+      }
+    } catch {
     }
     return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (event, targetUrl) => {
+    const trustedOrigins = getTrustedRendererOrigins();
+    if (electron.app.isPackaged && targetUrl.startsWith("file://")) return;
+    try {
+      const targetOrigin = new URL(targetUrl).origin;
+      if (trustedOrigins.includes(targetOrigin)) return;
+    } catch {
+    }
+    event.preventDefault();
   });
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -36959,6 +37009,11 @@ electron.app.whenReady().then(() => {
   createTray();
   let isProcessingFrame = false;
   electron.ipcMain.on(IPC_CHANNELS.SEND_FRAME, async (event, frame) => {
+    try {
+      assertTrustedSender(event);
+    } catch {
+      return;
+    }
     if (isProcessingFrame) return;
     isProcessingFrame = true;
     try {
@@ -36972,31 +37027,31 @@ electron.app.whenReady().then(() => {
       isProcessingFrame = false;
     }
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_METRICS, (event, type2, timeWindowMs) => {
+  safeHandle(IPC_CHANNELS.GET_METRICS, (event, type2, timeWindowMs) => {
     return mlEngine.getStore().getMetrics(type2, timeWindowMs);
   });
-  electron.ipcMain.handle("get-zone-metrics", (event, timeWindowMs) => {
+  safeHandle("get-zone-metrics", (event, timeWindowMs) => {
     return mlEngine.getStore().getZoneMetrics(timeWindowMs);
   });
-  electron.ipcMain.handle("get-monitor-metrics", (event, timeWindowMs) => {
+  safeHandle("get-monitor-metrics", (event, timeWindowMs) => {
     return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
+  safeHandle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
     return mlEngine.getStore().getNotificationSettings();
   });
-  electron.ipcMain.handle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
+  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
     mlEngine.getStore().updateNotificationSettings(settings);
     mlEngine.getNotificationManager().updateSettings(settings);
     return { success: true };
   });
-  electron.ipcMain.handle(IPC_CHANNELS.TEST_NOTIFICATION, (event, type2) => {
+  safeHandle(IPC_CHANNELS.TEST_NOTIFICATION, (event, type2) => {
     mlEngine.getNotificationManager().testNotification(type2);
     return { success: true };
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_AUTO_START, () => {
+  safeHandle(IPC_CHANNELS.GET_AUTO_START, () => {
     return electron.app.getLoginItemSettings().openAtLogin;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.SET_AUTO_START, (event, enable2) => {
+  safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable2) => {
     electron.app.setLoginItemSettings({
       openAtLogin: enable2,
       openAsHidden: true
@@ -37004,7 +37059,7 @@ electron.app.whenReady().then(() => {
     });
     return true;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
+  safeHandle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
     const memory = await process.getProcessMemoryInfo();
     const cpu = process.getCPUUsage();
     return {
@@ -37013,51 +37068,51 @@ electron.app.whenReady().then(() => {
       cpu: cpu.percentCPUUsage
     };
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_APP_SETTING, (event, key) => {
+  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key) => {
     return mlEngine.getStore().getAppSetting(key);
   });
-  electron.ipcMain.handle(IPC_CHANNELS.SET_APP_SETTING, (event, key, value) => {
+  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key, value) => {
     mlEngine.getStore().setAppSetting(key, value);
     return true;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.START_CALIBRATION, async () => {
+  safeHandle(IPC_CHANNELS.START_CALIBRATION, async () => {
     mlEngine.startCalibration();
     return;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
+  safeHandle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
     return mlEngine.getStore().getPostureBaseline();
   });
-  electron.ipcMain.handle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
+  safeHandle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
     mlEngine.getStore().setPostureBaseline(baseline);
     return;
   });
-  electron.ipcMain.handle("get-break-settings", () => {
+  safeHandle("get-break-settings", () => {
     return breakManager.getSettings();
   });
-  electron.ipcMain.handle("update-break-settings", (event, settings) => {
+  safeHandle("update-break-settings", (event, settings) => {
     breakManager.updateSettings(settings);
     return true;
   });
-  electron.ipcMain.handle("snooze-break", () => {
+  safeHandle("snooze-break", () => {
     breakManager.snoozeBreak(10);
     return true;
   });
-  electron.ipcMain.handle("skip-break", () => {
+  safeHandle("skip-break", () => {
     breakManager.skipBreak();
     return true;
   });
-  electron.ipcMain.handle("start-break", () => {
+  safeHandle("start-break", () => {
     breakManager.startBreak();
     return true;
   });
-  electron.ipcMain.handle("end-break", (event, postBreakStrain) => {
+  safeHandle("end-break", (event, postBreakStrain) => {
     breakManager.endBreak(postBreakStrain);
     return true;
   });
-  electron.ipcMain.handle("get-break-stats", (event, days) => {
+  safeHandle("get-break-stats", (event, days) => {
     return mlEngine.getStore().getBreakStats(days || 7);
   });
-  electron.ipcMain.handle("get-time-until-break", () => {
+  safeHandle("get-time-until-break", () => {
     return breakManager.getTimeUntilNextBreak();
   });
   breakManager.on("countdown-update", (data) => {

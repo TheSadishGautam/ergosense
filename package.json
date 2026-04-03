@@ -12,7 +12,13 @@
     "build:all": "tsc && vite build && electron-builder --mac --win --linux",
     "postinstall": "electron-builder install-app-deps",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint renderer/src electron/main.ts",
+    "typecheck:web": "tsc -p tsconfig.json --noEmit",
+    "typecheck:electron": "tsc -p tsconfig.node.json --noEmit",
+    "typecheck": "npm run typecheck:web && npm run typecheck:electron"
+  },
+  "engines": {
+    "node": ">=20 <21"
   },
   "keywords": [
     "ergonomics",

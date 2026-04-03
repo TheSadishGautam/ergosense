@@ -38,6 +38,12 @@ jobs:
       - name: Rebuild native modules
         run: npx electron-rebuild
 
+      - name: Typecheck (web + electron)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build and Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -18,6 +18,40 @@ const tabs: Array<{ id: AppView; label: string; icon: React.ReactNode }> = [
 ];
 
 export const AppShell: React.FC<AppShellProps> = ({ view, onViewChange, children, footerContent }) => {
+  const activeIndex = tabs.findIndex((tab) => tab.id === view);
+
+  const focusTabAt = (index: number) => {
+    const next = tabs[(index + tabs.length) % tabs.length];
+    onViewChange(next.id);
+    queueMicrotask(() => {
+      const id = `tab-${next.id.toLowerCase()}`;
+      const node = document.getElementById(id) as HTMLButtonElement | null;
+      node?.focus();
+    });
+  };
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      focusTabAt(index + 1);
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      focusTabAt(index - 1);
+      return;
+    }
+    if (e.key === 'Home') {
+      e.preventDefault();
+      focusTabAt(0);
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      focusTabAt(tabs.length - 1);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0a0e17 0%, #1a1f2e 100%)' }}>
       <div
@@ -49,14 +83,16 @@ export const AppShell: React.FC<AppShellProps> = ({ view, onViewChange, children
 
           <nav aria-label="Primary">
             <div style={{ display: 'flex', gap: 'var(--space-2)' }} role="tablist" aria-label="Main navigation">
-            {tabs.map((tab) => (
+            {tabs.map((tab, index) => (
               <button
                 key={tab.id}
                 id={`tab-${tab.id.toLowerCase()}`}
                 onClick={() => onViewChange(tab.id)}
+                onKeyDown={(e) => handleTabKeyDown(e, index)}
                 role="tab"
                 aria-selected={view === tab.id}
                 aria-controls={`panel-${tab.id.toLowerCase()}`}
+                tabIndex={index === activeIndex ? 0 : -1}
                 type="button"
                 style={{
                   padding: 'var(--space-3) var(--space-4)',

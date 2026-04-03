@@ -12,6 +12,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
   const [timeRemaining, setTimeRemaining] = useState(60);
   const CALIBRATION_DURATION = 60; // 60 seconds
   const primaryActionRef = useRef<HTMLButtonElement | null>(null);
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (stage !== 'CALIBRATING') return;
@@ -28,13 +29,19 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
       if (remaining <= 0) {
         clearInterval(interval);
         setStage('COMPLETE');
-        setTimeout(() => {
+        completionTimeoutRef.current = setTimeout(() => {
           onComplete();
         }, 2000); // Show success message for 2 seconds
       }
     }, 100);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
+    };
   }, [stage, onComplete]);
 
   const startCalibration = () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LiveState } from '../../../models/types';
 
 export const useBreakManager = (liveState: LiveState | null) => {
@@ -7,6 +7,12 @@ export const useBreakManager = (liveState: LiveState | null) => {
   const [timeUntilBreak, setTimeUntilBreak] = useState(0);
   const [showBreakCountdown, setShowBreakCountdown] = useState(false);
   const [isQuietMode, setIsQuietMode] = useState(false);
+  const liveStateRef = useRef<LiveState | null>(liveState);
+  const breakTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    liveStateRef.current = liveState;
+  }, [liveState]);
 
   useEffect(() => {
     const unsubCountdown = window.electronAPI.onBreakCountdownUpdate((data) => {
@@ -25,6 +31,9 @@ export const useBreakManager = (liveState: LiveState | null) => {
     });
 
     return () => {
+      if (breakTimeoutRef.current) {
+        clearTimeout(breakTimeoutRef.current);
+      }
       unsubCountdown();
       unsubBreakDue();
       unsubWarning();
@@ -35,9 +44,15 @@ export const useBreakManager = (liveState: LiveState | null) => {
     setShowBreakPrompt(false);
     await window.electronAPI.startBreak();
 
-    setTimeout(async () => {
-      const currentStrain = liveState ? (liveState.postureScore + liveState.eyeStrainScore) / 2 : 0;
+    if (breakTimeoutRef.current) {
+      clearTimeout(breakTimeoutRef.current);
+    }
+
+    breakTimeoutRef.current = setTimeout(async () => {
+      const current = liveStateRef.current;
+      const currentStrain = current ? (current.postureScore + current.eyeStrainScore) / 2 : 0;
       await window.electronAPI.endBreak(currentStrain);
+      breakTimeoutRef.current = null;
     }, breakDuration * 60 * 1000);
   };
 

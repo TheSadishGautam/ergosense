@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import { IPC_CHANNELS } from './ipc';
 import { MLEngine } from './mlEngine';
@@ -37,6 +37,52 @@ let isQuitting = false;
 
 const mlEngine = new MLEngine();
 const breakManager = new BreakManager(mlEngine.getStore());
+
+const getTrustedRendererOrigins = (): string[] => {
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  if (devUrl) {
+    try {
+      return [new URL(devUrl).origin];
+    } catch {
+      return [];
+    }
+  }
+
+  // file:// is expected in packaged mode when loading local index.html.
+  return ['file://'];
+};
+
+const isTrustedSender = (event: IpcMainEvent | IpcMainInvokeEvent): boolean => {
+  const senderUrl = event.senderFrame?.url || '';
+  if (!senderUrl) return false;
+
+  if (app.isPackaged) {
+    return senderUrl.startsWith('file://');
+  }
+
+  const trustedOrigins = getTrustedRendererOrigins();
+  try {
+    const origin = new URL(senderUrl).origin;
+    return trustedOrigins.includes(origin);
+  } catch {
+    return senderUrl.startsWith('file://');
+  }
+};
+
+const assertTrustedSender = (event: IpcMainEvent | IpcMainInvokeEvent): void => {
+  if (isTrustedSender(event)) return;
+  throw new Error('Rejected IPC from untrusted renderer origin');
+};
+
+const safeHandle = (
+  channel: string,
+  handler: (event: IpcMainInvokeEvent, ...args: any[]) => any
+) => {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedSender(event);
+    return handler(event, ...args);
+  });
+};
 
 function createTray() {
   const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png'); // Dev path
@@ -120,12 +166,30 @@ function createWindow() {
     win?.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info);
   });
 
-  // Open external links in default browser
+  // Open external links in default browser and deny any in-app popup navigation.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https:')) {
-      require('electron').shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:') {
+        shell.openExternal(url);
+      }
+    } catch {
+      // Ignore malformed URLs.
     }
     return { action: 'deny' };
+  });
+
+  // Keep the app pinned to trusted renderer origin.
+  win.webContents.on('will-navigate', (event, targetUrl) => {
+    const trustedOrigins = getTrustedRendererOrigins();
+    if (app.isPackaged && targetUrl.startsWith('file://')) return;
+    try {
+      const targetOrigin = new URL(targetUrl).origin;
+      if (trustedOrigins.includes(targetOrigin)) return;
+    } catch {
+      // malformed URL should be blocked
+    }
+    event.preventDefault();
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -161,6 +225,12 @@ app.whenReady().then(() => {
   let isProcessingFrame = false;
 
   ipcMain.on(IPC_CHANNELS.SEND_FRAME, async (event, frame: FrameMessage) => {
+    try {
+      assertTrustedSender(event);
+    } catch {
+      return;
+    }
+
     if (isProcessingFrame) return; // Drop frame if busy
     
     isProcessingFrame = true;
@@ -179,41 +249,41 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.GET_METRICS, (event, type: string, timeWindowMs: number) => {
+  safeHandle(IPC_CHANNELS.GET_METRICS, (event, type: string, timeWindowMs: number) => {
     return mlEngine.getStore().getMetrics(type, timeWindowMs);
   });
 
-  ipcMain.handle('get-zone-metrics', (event, timeWindowMs: number) => {
+  safeHandle('get-zone-metrics', (event, timeWindowMs: number) => {
     return mlEngine.getStore().getZoneMetrics(timeWindowMs);
   });
 
-  ipcMain.handle('get-monitor-metrics', (event, timeWindowMs: number) => {
+  safeHandle('get-monitor-metrics', (event, timeWindowMs: number) => {
     return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
   });
 
 
   // Notification settings handlers
-  ipcMain.handle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
+  safeHandle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
     return mlEngine.getStore().getNotificationSettings();
   });
 
-  ipcMain.handle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
+  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
     mlEngine.getStore().updateNotificationSettings(settings);
     mlEngine.getNotificationManager().updateSettings(settings);
     return { success: true };
   });
 
-  ipcMain.handle(IPC_CHANNELS.TEST_NOTIFICATION, (event, type) => {
+  safeHandle(IPC_CHANNELS.TEST_NOTIFICATION, (event, type) => {
     mlEngine.getNotificationManager().testNotification(type);
     return { success: true };
   });
 
   // Auto-start handlers
-  ipcMain.handle(IPC_CHANNELS.GET_AUTO_START, () => {
+  safeHandle(IPC_CHANNELS.GET_AUTO_START, () => {
     return app.getLoginItemSettings().openAtLogin;
   });
 
-  ipcMain.handle(IPC_CHANNELS.SET_AUTO_START, (event, enable: boolean) => {
+  safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable: boolean) => {
     app.setLoginItemSettings({
       openAtLogin: enable,
       openAsHidden: true, // Optional: start hidden
@@ -222,7 +292,7 @@ app.whenReady().then(() => {
   });
 
   // System Stats Handler
-  ipcMain.handle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
+  safeHandle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
     const memory = await process.getProcessMemoryInfo();
     const cpu = process.getCPUUsage();
     return {
@@ -231,64 +301,64 @@ app.whenReady().then(() => {
     };
   });
 
-  ipcMain.handle(IPC_CHANNELS.GET_APP_SETTING, (event, key: string) => {
+  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key: string) => {
     return mlEngine.getStore().getAppSetting(key);
   });
 
-  ipcMain.handle(IPC_CHANNELS.SET_APP_SETTING, (event, key: string, value: any) => {
+  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key: string, value: any) => {
     mlEngine.getStore().setAppSetting(key, value);
     return true;
   });
 
-  ipcMain.handle(IPC_CHANNELS.START_CALIBRATION, async () => {
+  safeHandle(IPC_CHANNELS.START_CALIBRATION, async () => {
     mlEngine.startCalibration();
     return;
   });
 
-  ipcMain.handle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
+  safeHandle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
     return mlEngine.getStore().getPostureBaseline();
   });
 
-  ipcMain.handle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
+  safeHandle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
     mlEngine.getStore().setPostureBaseline(baseline);
     return;
   });
 
   // Break Management Handlers
-  ipcMain.handle('get-break-settings', () => {
+  safeHandle('get-break-settings', () => {
     return breakManager.getSettings();
   });
 
-  ipcMain.handle('update-break-settings', (event, settings) => {
+  safeHandle('update-break-settings', (event, settings) => {
     breakManager.updateSettings(settings);
     return true;
   });
 
-  ipcMain.handle('snooze-break', () => {
+  safeHandle('snooze-break', () => {
     breakManager.snoozeBreak(10);
     return true;
   });
 
-  ipcMain.handle('skip-break', () => {
+  safeHandle('skip-break', () => {
     breakManager.skipBreak();
     return true;
   });
 
-  ipcMain.handle('start-break', () => {
+  safeHandle('start-break', () => {
     breakManager.startBreak();
     return true;
   });
 
-  ipcMain.handle('end-break', (event, postBreakStrain) => {
+  safeHandle('end-break', (event, postBreakStrain) => {
     breakManager.endBreak(postBreakStrain);
     return true;
   });
 
-  ipcMain.handle('get-break-stats', (event, days) => {
+  safeHandle('get-break-stats', (event, days) => {
     return mlEngine.getStore().getBreakStats(days || 7);
   });
 
-  ipcMain.handle('get-time-until-break', () => {
+  safeHandle('get-time-until-break', () => {
     return breakManager.getTimeUntilNextBreak();
   });
 

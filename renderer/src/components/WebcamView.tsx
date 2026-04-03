@@ -1,41 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { FrameMessage } from '../../../models/types';
 
-const FRAME_RATE = 100; // Capture every 100ms
+const FRAME_INTERVAL_MS = 150;
+const WIDTH = 224;
+const HEIGHT = 224;
 
 export const WebcamView = React.memo(() => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastSentAtRef = useRef(0);
 
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-
-        intervalId = setInterval(captureAndSendFrame, FRAME_RATE);
-      } catch (err) {
-        console.error("Error accessing webcam:", err);
-      }
-    };
-
-    startCamera();
-
-    return () => {
-      clearInterval(intervalId);
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  const captureAndSendFrame = () => {
+  function captureAndSendFrame() {
     if (!videoRef.current || !canvasRef.current) return;
+    if (document.hidden) return;
+
+    const now = Date.now();
+    if (now - lastSentAtRef.current < FRAME_INTERVAL_MS) return;
+    lastSentAtRef.current = now;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -45,32 +26,59 @@ export const WebcamView = React.memo(() => {
 
     // Draw video frame to canvas
     // Downscale for performance (e.g., 224x224 or similar small size)
-    const width = 224;
-    const height = 224;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
     
-    canvas.width = width;
-    canvas.height = height;
-    
-    ctx.drawImage(video, 0, 0, width, height);
+    ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
 
     // Get raw pixel data
-    const imageData = ctx.getImageData(0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
     
     // Send to main process
     const frameMessage: FrameMessage = {
-      width,
-      height,
+      width: WIDTH,
+      height: HEIGHT,
       data: new Uint8Array(imageData.data.buffer), // Convert to Uint8Array
       timestamp: Date.now(),
     };
 
     window.electronAPI.sendFrame(frameMessage);
-  };
+  }
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let activeStream: MediaStream | null = null;
+
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        activeStream = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = activeStream;
+        }
+
+        intervalId = setInterval(captureAndSendFrame, FRAME_INTERVAL_MS);
+      } catch (err) {
+        console.error("Error accessing webcam:", err);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   return (
-    <div className="card" style={{ 
-      position: 'relative', 
-      width: '420px', 
+    <div className="card" style={{
+      position: 'relative',
+      width: '420px',
       height: '315px',
       padding: 0,
       overflow: 'hidden',
