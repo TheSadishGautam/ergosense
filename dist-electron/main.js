@@ -25,7 +25,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 const electron = require("electron");
 const path$q = require("node:path");
-const ort = require("onnxruntime-node");
 const Database = require("better-sqlite3");
 const path$r = require("path");
 const require$$1$5 = require("fs");
@@ -73,7 +72,6 @@ function _interopNamespaceDefault(e) {
   return Object.freeze(n);
 }
 const electron__namespace = /* @__PURE__ */ _interopNamespaceDefault(electron);
-const ort__namespace = /* @__PURE__ */ _interopNamespaceDefault(ort);
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path$r);
 const urlModule__namespace = /* @__PURE__ */ _interopNamespaceDefault(urlModule);
 const diagnosticsChannel__namespace = /* @__PURE__ */ _interopNamespaceDefault(diagnosticsChannel);
@@ -98,6 +96,21 @@ const IPC_CHANNELS = {
   GET_POSTURE_BASELINE: "get-posture-baseline",
   SET_POSTURE_BASELINE: "set-posture-baseline"
 };
+let ort$1;
+try {
+  ort$1 = require("onnxruntime-node");
+} catch (e) {
+  if (process.platform === "win32") {
+    electron.dialog.showErrorBox(
+      "Missing System Dependency",
+      'ErgoSense requires the Visual C++ Redistributable to run.\n\nPlease install "Visual C++ Redistributable for Visual Studio 2015-2022" and try again.\n\nError: ' + e.message
+    );
+    electron.app.quit();
+    process.exit(1);
+  } else {
+    throw e;
+  }
+}
 const MODEL_PATH$1 = electron.app.isPackaged ? path$q.join(process.resourcesPath, "resources", "movenet_lightning.onnx") : path$q.join(__dirname, "../resources/movenet_lightning.onnx");
 class PoseModel {
   constructor() {
@@ -107,7 +120,7 @@ class PoseModel {
   async load() {
     console.log("Attempting to load model from:", MODEL_PATH$1);
     try {
-      this.session = await ort__namespace.InferenceSession.create(MODEL_PATH$1);
+      this.session = await ort$1.InferenceSession.create(MODEL_PATH$1);
       this.inputName = this.session.inputNames[0];
       console.log("Pose model loaded successfully");
     } catch (e) {
@@ -145,7 +158,7 @@ class PoseModel {
         int32Data[dstIdx + 2] = data[srcIdx + 2];
       }
     }
-    return new ort__namespace.Tensor("int32", int32Data, [1, 192, 192, 3]);
+    return new ort$1.Tensor("int32", int32Data, [1, 192, 192, 3]);
   }
   postprocess(data) {
     const keypoints = [];
@@ -160,6 +173,21 @@ class PoseModel {
     return keypoints;
   }
 }
+let ort;
+try {
+  ort = require("onnxruntime-node");
+} catch (e) {
+  if (process.platform === "win32") {
+    electron.dialog.showErrorBox(
+      "Missing System Dependency",
+      'ErgoSense requires the Visual C++ Redistributable to run.\n\nPlease install "Visual C++ Redistributable for Visual Studio 2015-2022" and try again.\n\nError: ' + e.message
+    );
+    electron.app.quit();
+    process.exit(1);
+  } else {
+    throw e;
+  }
+}
 const MODEL_PATH = electron.app.isPackaged ? path$q.join(process.resourcesPath, "resources", "face_mesh.onnx") : path$q.join(__dirname, "../resources/face_mesh.onnx");
 class FaceModel {
   constructor() {
@@ -169,7 +197,7 @@ class FaceModel {
   async load() {
     console.log("Attempting to load face model from:", MODEL_PATH);
     try {
-      this.session = await ort__namespace.InferenceSession.create(MODEL_PATH);
+      this.session = await ort.InferenceSession.create(MODEL_PATH);
       this.inputName = this.session.inputNames[0];
       console.log("Face model loaded successfully");
       console.log("Input names:", this.session.inputNames);
@@ -207,12 +235,12 @@ class FaceModel {
       const tensor = this.preprocess(frame, cropRect);
       const feeds = {};
       feeds[this.inputName] = tensor;
-      feeds["crop_x1"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.x)]), [1, 1]);
-      feeds["crop_y1"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.y)]), [1, 1]);
-      feeds["crop_x2"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.x + cropRect.width)]), [1, 1]);
-      feeds["crop_y2"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.y + cropRect.height)]), [1, 1]);
-      feeds["crop_width"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.width)]), [1, 1]);
-      feeds["crop_height"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.height)]), [1, 1]);
+      feeds["crop_x1"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.x)]), [1, 1]);
+      feeds["crop_y1"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.y)]), [1, 1]);
+      feeds["crop_x2"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.x + cropRect.width)]), [1, 1]);
+      feeds["crop_y2"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.y + cropRect.height)]), [1, 1]);
+      feeds["crop_width"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.width)]), [1, 1]);
+      feeds["crop_height"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.height)]), [1, 1]);
       const results = await this.session.run(feeds);
       const outputName = "final_landmarks";
       const output = results[outputName];
@@ -245,7 +273,7 @@ class FaceModel {
         float32Data[2 * targetSize * targetSize + y * targetSize + x] = b;
       }
     }
-    return new ort__namespace.Tensor("float32", float32Data, [1, 3, 192, 192]);
+    return new ort.Tensor("float32", float32Data, [1, 3, 192, 192]);
   }
 }
 var NotificationType = /* @__PURE__ */ ((NotificationType2) => {

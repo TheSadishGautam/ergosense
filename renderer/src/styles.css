@@ -35,6 +35,10 @@
   --text-secondary: rgba(255, 255, 255, 0.7);
   --text-tertiary: rgba(255, 255, 255, 0.5);
   --text-glow: rgba(234, 88, 11, 1);
+  --success-light: #6ee7b7;
+  --warning-light: #fcd34d;
+  --danger-light: #fca5a5;
+  --info-light: #93c5fd;
   
   /* ===== SPACING ===== */
   --space-1: 4px;
@@ -65,13 +69,23 @@
   --danger-glow: rgba(239, 68, 68, 0.3);
   --info: #3b82f6;
   --info-glow: rgba(59, 130, 246, 0.3);
+  /* Tier + chart (mirror renderer/src/utils/tokens.ts) */
+  --color-excellent: #6366f1;
+  --chart-posture: #a855f7;
+  --chart-posture-mid: #c084fc;
+  --chart-eye-strain: #ea580c;
   
   /* ===== GRADIENT PRESETS ===== */
   --gradient-primary: linear-gradient(135deg, #ea580b 0%, #fb923c 100%);
+  --gradient-orange: linear-gradient(135deg, #ea580b 0%, #fb923c 100%);
+  --gradient-card: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.7) 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  --brand-orange: #ea580b;
+  --border-color: rgba(255, 255, 255, 0.12);
+  --gray-800: rgba(255, 255, 255, 0.12);
   
   /* ===== TRANSITIONS ===== */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -189,6 +203,13 @@ body {
   height: 300px;
 }
 
+.btn:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--brand-primary-light);
+  outline-offset: 2px;
+}
+
 .btn-primary {
   background: var(--gradient-primary);
   color: white;
@@ -257,12 +278,26 @@ h1 {
   100% { background-position: 1000px 0; }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 220ms ease-out;
 }
 
 /* ===== UTILITY CLASSES ===== */
@@ -273,7 +308,7 @@ h1 {
 .justify-between { justify-content: space-between; }
 .gap-2 { gap: var(--space-2); }
 .gap-3 { gap: var(--space-3); }
-.gap-4 { gap: --space-4); }
+.gap-4 { gap: var(--space-4); }
 
 .text-glow {
   color: var(--text-glow);
@@ -304,4 +339,117 @@ h1 {
 .backdrop-blur {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* ===== METRIC CARDS (dashboard) — hover via CSS, accent from --metric-accent ===== */
+.metric-card-interactive {
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.metric-card-interactive:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--metric-accent) 40%, transparent);
+}
+
+/* ===== DASHBOARD CHART SURFACES ===== */
+.dashboard-chart-card {
+  position: relative;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.dashboard-chart-border--info {
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.dashboard-chart-card:hover {
+  transform: translateY(-4px);
+}
+
+.dashboard-chart-card[data-dashboard-hover='orange']:hover {
+  box-shadow: 0 12px 24px rgba(234, 88, 12, 0.2);
+}
+
+.dashboard-chart-card[data-dashboard-hover='green']:hover {
+  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.2);
+}
+
+.dashboard-chart-card[data-dashboard-hover='purple']:hover {
+  box-shadow: 0 12px 24px rgba(168, 85, 247, 0.2);
+}
+
+.dashboard-chart-icon {
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: transform var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-chart-icon--orange {
+  background: var(--gradient-orange);
+  color: white;
+}
+
+.dashboard-chart-icon--success {
+  background: var(--gradient-success);
+  color: white;
+}
+
+.dashboard-chart-card:hover .dashboard-chart-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.break-primary-button:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(234, 88, 11, 0.6) !important;
+}
+
+.break-secondary-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.break-skip-button:hover {
+  color: var(--text-secondary) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Floating break countdown — hover scale via CSS (no DOM style mutation) */
+.break-countdown-widget {
+  transition: transform 0.3s ease;
+}
+
+.break-countdown-widget:hover {
+  transform: scale(1.05);
+}
+
+/* Update banner — hover without inline handlers */
+.update-banner-download-btn {
+  transition: transform 0.2s;
+}
+
+.update-banner-download-btn:hover {
+  transform: scale(1.05);
+}
+
+.update-banner-dismiss-btn {
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.update-banner-dismiss-btn:hover {
+  opacity: 1;
+}
+
+.grid {
+  display: grid;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gap-6 {
+  gap: var(--space-6);
 }

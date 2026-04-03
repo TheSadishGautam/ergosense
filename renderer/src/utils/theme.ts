@@ -1,26 +1,38 @@
+import { TOKENS, rgba, statusTierGradient } from './tokens';
+
 export const COLORS = {
-  excellent: '#6366f1', // Indigo
-  good: '#10b981',      // Emerald
-  warning: '#f59e0b',   // Amber
-  danger: '#ef4444',    // Red
-  info: '#3b82f6',      // Blue
+  excellent: TOKENS.status.excellent,
+  good: TOKENS.status.good,
+  warning: TOKENS.status.warning,
+  danger: TOKENS.status.danger,
+  info: TOKENS.status.info,
   text: {
     primary: '#ffffff',
     secondary: 'rgba(255, 255, 255, 0.7)',
     tertiary: 'rgba(255, 255, 255, 0.5)',
   },
   background: {
-    primary: '#0f172a',
-    secondary: '#1e293b',
-    tertiary: '#334155',
-  }
-};
+    primary: TOKENS.background.slate900,
+    secondary: TOKENS.background.slate800,
+    tertiary: TOKENS.background.slate700,
+  },
+} as const;
 
 export const GRADIENTS = {
-  excellent: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(79, 70, 229, 0.1) 100%)',
-  good: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%)',
-  warning: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.1) 100%)',
-  danger: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)',
-  card: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.7) 100%)',
-  orange: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-};
+  excellent: statusTierGradient(TOKENS.status.excellent),
+  good: statusTierGradient(TOKENS.status.good),
+  warning: statusTierGradient(TOKENS.status.warning),
+  danger: statusTierGradient(TOKENS.status.danger),
+  card: `linear-gradient(135deg, ${rgba(TOKENS.background.slate800, 0.7)} 0%, ${rgba(TOKENS.background.slate900, 0.7)} 100%)`,
+  orange: `linear-gradient(135deg, ${TOKENS.brand.primary} 0%, ${TOKENS.brand.primaryDark} 100%)`,
+} as const;
+
+/** Recharts / dashboard series — import from here instead of hard-coded hex in components */
+export const CHART = {
+  posture: TOKENS.chart.posture,
+  postureMid: TOKENS.chart.postureMid,
+  eyeStrain: TOKENS.chart.eyeStrain,
+  barBlink: TOKENS.chart.barBlink,
+  infoStroke: TOKENS.status.info,
+  infoStrokeEnd: '#2563eb',
+} as const;

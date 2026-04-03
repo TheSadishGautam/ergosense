@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { StretchExercise, getStretchRoutine, calculateRoutineDuration } from '../../../models/stretches';
 
 interface StretchGuideProps {
@@ -13,6 +14,7 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
   const [currentStep, setCurrentStep] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(routine[0]?.duration || 0);
   const [isPaused, setIsPaused] = useState(false);
+  const primaryActionRef = useRef<HTMLButtonElement | null>(null);
 
   const currentExercise = routine[currentExerciseIndex];
   const totalDuration = calculateRoutineDuration(routine);
@@ -42,6 +44,15 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
     return () => clearInterval(timer);
   }, [currentExerciseIndex, isPaused, routine, currentExercise, onComplete]);
 
+  useEffect(() => {
+    primaryActionRef.current?.focus();
+  }, [currentExerciseIndex]);
+
+  const dismissStretch = useCallback(() => {
+    onDismiss();
+  }, [onDismiss]);
+  useEscapeKey(dismissStretch);
+
   const handleNext = () => {
     if (currentExerciseIndex < routine.length - 1) {
       setCurrentExerciseIndex(currentExerciseIndex + 1);
@@ -59,7 +70,7 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
   if (!currentExercise) return null;
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-labelledby="stretch-guide-title" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -80,7 +91,7 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
         marginBottom: 'var(--space-6)',
       }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'white' }}>
+          <h2 id="stretch-guide-title" style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'white' }}>
             ⏸️ Time for a Stretch Break!
           </h2>
           <p style={{ margin: 0, marginTop: 'var(--space-1)', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
@@ -89,6 +100,7 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <button
+            type="button"
             onClick={onSnooze}
             className="btn btn-ghost"
             style={{ fontSize: '0.875rem' }}
@@ -96,6 +108,7 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             ⏰ Snooze 5min
           </button>
           <button
+            type="button"
             onClick={onDismiss}
             className="btn btn-ghost"
             style={{ fontSize: '0.875rem' }}
@@ -242,6 +255,8 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
           {/* Controls */}
           <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
             <button
+              ref={primaryActionRef}
+              type="button"
               onClick={() => setIsPaused(!isPaused)}
               className="btn"
               style={{
@@ -253,6 +268,7 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             </button>
             {currentExerciseIndex < routine.length - 1 && (
               <button
+                type="button"
                 onClick={handleSkip}
                 className="btn btn-ghost"
                 style={{ padding: 'var(--space-3) var(--space-6)' }}

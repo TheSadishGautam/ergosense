@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, RadialBarChart, RadialBar, PieChart, Pie, Cell
+  ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { 
   Activity, Eye, Zap, TrendingUp, Clock, Calendar, 
-  BarChart2, PieChart as PieChartIcon, Monitor, RotateCcw, LayoutGrid, CheckCircle 
+  Monitor, RotateCcw, LayoutGrid, CheckCircle 
 } from 'lucide-react';
 import { useMetrics, TimeRange } from '../hooks/useMetrics';
 import { MetricCard } from './MetricCard';
@@ -16,7 +16,7 @@ import { MultiMonitorStats } from './MultiMonitorStats';
 import { CustomTooltip } from './CustomTooltip';
 import { formatTime, aggregateByHour } from '../utils/chartHelpers';
 import { getPostureStatus, getEyeStatus, getBlinkStatus } from '../utils/statusHelpers';
-import { COLORS } from '../utils/theme';
+import { CHART, COLORS } from '../utils/theme';
 
 // Time windows mapping
 const timeWindows: Record<TimeRange, number> = {
@@ -44,7 +44,7 @@ export const Dashboard: React.FC = React.memo(() => {
       }
     };
     fetchZoneData();
-  }, [timeRange, timeWindows]);
+  }, [timeRange]);
 
   // Calculate ergonomic score (composite metric)
   const ergonomicScore = React.useMemo(() => 
@@ -89,7 +89,7 @@ export const Dashboard: React.FC = React.memo(() => {
   return (
     <div style={{ padding: 'var(--space-6)', maxWidth: '1400px', margin: '0 auto' }} className="animate-fadeIn">
       {/* Header */}
-      <div style={{ 
+      <header style={{
         marginBottom: 'var(--space-8)',
         padding: 'var(--space-8)',
         background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%)',
@@ -136,7 +136,7 @@ export const Dashboard: React.FC = React.memo(() => {
           </div>
           <TimeRangeSelector selected={timeRange} onChange={setTimeRange} />
         </div>
-      </div>
+      </header>
 
       {/* Key Metrics Grid - Premium Cards */}
       <div style={{ 
@@ -225,38 +225,24 @@ export const Dashboard: React.FC = React.memo(() => {
         marginBottom: 'var(--space-8)',
       }}>
         {/* Dual-Axis Chart: Posture + Eye Strain */}
-        <div className="card-glass" style={{ 
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          position: 'relative',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow = '0 12px 24px rgba(234, 88, 12, 0.2)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '';
-        }}
+        <section
+          className="card-glass dashboard-chart-card dashboard-chart-border--info"
+          data-dashboard-hover="orange"
+          role="region"
+          aria-label="Posture and eye strain trends chart"
         >
-          {/* Blue accent line */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '2px',
-            background: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)',
-          }} />
-          <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{
-              padding: 'var(--space-2)',
-              background: 'var(--gradient-orange)',
-              borderRadius: 'var(--radius-md)',
-              transition: 'transform 0.3s ease',
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: `linear-gradient(90deg, ${CHART.infoStroke} 0%, ${CHART.infoStrokeEnd} 100%)`,
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
-            >
+          />
+          <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
+            <div className="dashboard-chart-icon dashboard-chart-icon--orange">
               <TrendingUp size={20} />
             </div>
             <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Posture & Eye Strain Trends</h3>
@@ -265,12 +251,12 @@ export const Dashboard: React.FC = React.memo(() => {
             <AreaChart data={combinedData}>
               <defs>
                 <linearGradient id="colorPosture" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#a855f7" stopOpacity={0.1}/>
+                  <stop offset="5%" stopColor={CHART.posture} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={CHART.posture} stopOpacity={0.1}/>
                 </linearGradient>
                 <linearGradient id="colorEye" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ea580c" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#ea580c" stopOpacity={0.1}/>
+                  <stop offset="5%" stopColor={CHART.eyeStrain} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={CHART.eyeStrain} stopOpacity={0.1}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -290,7 +276,7 @@ export const Dashboard: React.FC = React.memo(() => {
               <Area 
                 type="monotone" 
                 dataKey="posture" 
-                stroke="#a855f7" 
+                stroke={CHART.posture} 
                 fillOpacity={1} 
                 fill="url(#colorPosture)"
                 name="Posture"
@@ -299,7 +285,7 @@ export const Dashboard: React.FC = React.memo(() => {
               <Area 
                 type="monotone" 
                 dataKey="eyeStrain" 
-                stroke="#ea580c" 
+                stroke={CHART.eyeStrain} 
                 fillOpacity={1} 
                 fill="url(#colorEye)"
                 name="Eye Strain"
@@ -307,41 +293,25 @@ export const Dashboard: React.FC = React.memo(() => {
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
         {/* Blink Frequency */}
-        <div className="card-glass" style={{ 
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          position: 'relative',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow = '0 12px 24px rgba(234, 88, 12, 0.2)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '';
-        }}
+        <section
+          className="card-glass dashboard-chart-card dashboard-chart-border--info"
+          data-dashboard-hover="orange"
+          role="region"
+          aria-label="Blink frequency chart"
         >
-          {/* Blue accent line */}
           <div style={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
             height: '2px',
-            background: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)',
+            background: `linear-gradient(90deg, ${CHART.infoStroke} 0%, ${CHART.infoStrokeEnd} 100%)`,
           }} />
           <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{
-              padding: 'var(--space-2)',
-              background: 'var(--gradient-orange)',
-              borderRadius: 'var(--radius-md)',
-              transition: 'transform 0.3s ease',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
-            >
+            <div className="dashboard-chart-icon dashboard-chart-icon--orange">
               <Zap size={20} />
             </div>
             <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Blink Frequency</h3>
@@ -363,7 +333,7 @@ export const Dashboard: React.FC = React.memo(() => {
               <Legend />
               <Bar 
                 dataKey="value" 
-                fill="#ea580c" 
+                fill={CHART.barBlink} 
                 name="Blinks/min"
                 radius={[8, 8, 0, 0]}
               />
@@ -376,7 +346,7 @@ export const Dashboard: React.FC = React.memo(() => {
             border: '1px solid rgba(234, 88, 12, 0.3)',
             borderRadius: 'var(--radius-md)',
             fontSize: '0.875rem',
-            color: '#fb923c',
+            color: 'var(--brand-primary-light)',
             textAlign: 'center',
             display: 'flex',
             alignItems: 'center',
@@ -385,35 +355,20 @@ export const Dashboard: React.FC = React.memo(() => {
           }}>
             <Zap size={16} /> Target: 12-20 blinks per minute
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Secondary Charts */}
       <div className="grid grid-cols-2 gap-6" style={{ marginBottom: 'var(--space-8)' }}>
         {/* Posture Distribution */}
-        <div className="card-glass" style={{ 
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          position: 'relative',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow = '0 12px 24px rgba(16, 185, 129, 0.2)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '';
-        }}
+        <section
+          className="card-glass dashboard-chart-card dashboard-chart-border--info"
+          data-dashboard-hover="green"
+          role="region"
+          aria-label="Posture distribution pie chart"
         >
           <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{
-              padding: 'var(--space-2)',
-              background: 'var(--gradient-success)',
-              borderRadius: 'var(--radius-md)',
-              transition: 'transform 0.3s ease',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
-            >
+            <div className="dashboard-chart-icon dashboard-chart-icon--success">
               <span style={{ fontSize: '1.25rem' }}>🎯</span>
             </div>
             <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Posture Distribution</h3>
@@ -437,33 +392,21 @@ export const Dashboard: React.FC = React.memo(() => {
               <Tooltip content={<CustomTooltip />} />
             </PieChart>
           </ResponsiveContainer>
-        </div>
+        </section>
 
         {/* Hourly Activity */}
-        <div className="card" style={{ 
-          background: 'var(--gradient-card)',
-          border: '1px solid rgba(168, 85, 247, 0.2)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow = '0 12px 24px rgba(234, 88, 12, 0.2)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '';
-        }}
+        <section
+          className="card dashboard-chart-card"
+          data-dashboard-hover="purple"
+          role="region"
+          aria-label="Hourly posture average line chart"
+          style={{
+            background: 'var(--gradient-card)',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+          }}
         >
           <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{
-              padding: 'var(--space-2)',
-              background: 'var(--gradient-orange)',
-              borderRadius: 'var(--radius-md)',
-              transition: 'transform 0.3s ease',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
-            >
+            <div className="dashboard-chart-icon dashboard-chart-icon--orange">
               <span style={{ fontSize: '1.25rem' }}>⏰</span>
             </div>
             <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>Hourly Posture Average</h3>
@@ -486,14 +429,14 @@ export const Dashboard: React.FC = React.memo(() => {
               <Line 
                 type="monotone" 
                 dataKey="value" 
-                stroke="#c084fc" 
+                stroke={CHART.postureMid} 
                 strokeWidth={3}
-                dot={{ fill: '#a855f7', r: 4 }}
+                dot={{ fill: CHART.posture, r: 4 }}
                 name="Posture Score"
               />
             </LineChart>
           </ResponsiveContainer>
-        </div>
+        </section>
       </div>
 
       {/* Insights Panel */}

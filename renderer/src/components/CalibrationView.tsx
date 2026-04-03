@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface CalibrationViewProps {
   onComplete: () => void;
@@ -10,6 +11,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
   const [progress, setProgress] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(60);
   const CALIBRATION_DURATION = 60; // 60 seconds
+  const primaryActionRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (stage !== 'CALIBRATING') return;
@@ -69,8 +71,17 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
     };
   }, [stage]);
 
+  useEffect(() => {
+    primaryActionRef.current?.focus();
+  }, [stage]);
+
+  const cancelCalibration = useCallback(() => {
+    if (stage === 'INSTRUCTION' || stage === 'CALIBRATING') onCancel();
+  }, [stage, onCancel]);
+  useEscapeKey(cancelCalibration, stage !== 'COMPLETE');
+
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-labelledby="calibration-title" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -122,7 +133,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
               }}>
                 🎯
               </div>
-              <h2 style={{
+              <h2 id="calibration-title" style={{
                 fontSize: '1.75rem',
                 fontWeight: 800,
                 margin: 0,
@@ -189,6 +200,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
               justifyContent: 'center',
             }}>
               <button
+                type="button"
                 onClick={onCancel}
                 className="btn btn-ghost"
                 style={{
@@ -199,6 +211,8 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onComplete, on
                 Cancel
               </button>
               <button
+                ref={primaryActionRef}
+                type="button"
                 onClick={startCalibration}
                 className="btn btn-active"
                 style={{

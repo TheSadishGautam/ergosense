@@ -14,6 +14,7 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
   if (isQuietMode) {
     return (
       <div
+        className="break-countdown-widget"
         style={{
           position: 'fixed',
           bottom: '24px',
@@ -62,6 +63,7 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
 
   return (
     <div
+      className="break-countdown-widget"
       onClick={onViewDetails}
       style={{
         position: 'fixed',
@@ -76,12 +78,6 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
         cursor: 'pointer',
         zIndex: 1000,
         transition: 'all 0.3s ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.05)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
