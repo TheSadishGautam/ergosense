@@ -43,11 +43,11 @@ export const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, l
                 </span>
               </div>
               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {/* Format based on value range or name */}
-                {entry.name.toLowerCase().includes('rate') || entry.name.toLowerCase().includes('blink') 
-                  ? `${Number(entry.value).toFixed(0)}/min`
-                  : `${(Number(entry.value) * 100).toFixed(0)}%`
-                }
+                {entry.value == null || Number.isNaN(Number(entry.value))
+                  ? '—'
+                  : entry.name.toLowerCase().includes('rate') || entry.name.toLowerCase().includes('blink')
+                    ? `${Number(entry.value).toFixed(0)}/min`
+                    : `${(Number(entry.value) * 100).toFixed(0)}%`}
               </span>
             </div>
           ))}

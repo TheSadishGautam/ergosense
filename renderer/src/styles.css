@@ -453,3 +453,222 @@ h1 {
 .gap-6 {
   gap: var(--space-6);
 }
+
+/* ===== DASHBOARD (Phase 1 layout primitives) ===== */
+.dashboard-page {
+  min-height: 0;
+}
+
+.dashboard-hero {
+  margin-bottom: var(--space-8);
+  padding: var(--space-8);
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(234, 88, 12, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-hero__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-orange);
+}
+
+.dashboard-hero__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.dashboard-hero__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboard-compare-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-compare-toggle__btn {
+  appearance: none;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.dashboard-compare-toggle__btn.is-active {
+  background: rgba(234, 88, 11, 0.2);
+  color: white;
+}
+
+.dashboard-hero__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.dashboard-hero__logo {
+  padding: var(--space-3);
+  background: var(--gradient-orange);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-hero__title {
+  margin: 0;
+  color: white;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.dashboard-hero__meta {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  margin: 0 0 0 68px;
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.dashboard-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.dashboard-grid--2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid--3,
+  .dashboard-grid--2 {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero__meta {
+    margin-left: 0;
+  }
+}
+
+.dashboard-panel--padded {
+  padding: var(--space-6);
+}
+
+.dashboard-panel {
+  border-radius: var(--radius-lg);
+}
+
+.dashboard-panel__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-orange);
+}
+
+.dashboard-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.dashboard-panel-header__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.dashboard-panel-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--gradient-orange);
+  color: white;
+}
+
+.dashboard-panel-header__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dashboard-panel-header__desc {
+  margin: var(--space-1) 0 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.dashboard-skeleton {
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 100%);
+  background-size: 200% 100%;
+  animation: dashboardShimmer 1.3s ease-in-out infinite;
+}
+
+.dashboard-skeleton--hero {
+  height: 126px;
+  margin-bottom: var(--space-8);
+}
+
+.dashboard-skeleton--card {
+  height: 142px;
+}
+
+.dashboard-skeleton--chart {
+  height: 360px;
+}
+
+.dashboard-skeleton--panel {
+  height: 220px;
+}
+
+.dashboard-compare-note {
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--info-light);
+  font-size: 0.85rem;
+}
+
+@keyframes dashboardShimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

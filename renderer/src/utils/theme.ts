@@ -33,6 +33,10 @@ export const CHART = {
   postureMid: TOKENS.chart.postureMid,
   eyeStrain: TOKENS.chart.eyeStrain,
   barBlink: TOKENS.chart.barBlink,
+  /** Muted overlays for previous-period compare series */
+  posturePrev: rgba(TOKENS.chart.posture, 0.5),
+  eyeStrainPrev: rgba(TOKENS.chart.eyeStrain, 0.5),
+  barBlinkPrev: rgba(TOKENS.chart.barBlink, 0.45),
   infoStroke: TOKENS.status.info,
   infoStrokeEnd: '#2563eb',
 } as const;
