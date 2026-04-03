@@ -39,12 +39,10 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
   const [newQuietStart, setNewQuietStart] = useState('');
   const [newQuietEnd, setNewQuietEnd] = useState('');
 
-  // Dirty state tracking
   const initialSettingsRef = useRef<NotificationSettings | null>(null);
   const initialBreakSettingsRef = useRef<BreakSettings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
 
-  // Check for changes
   useEffect(() => {
     if (!initialSettingsRef.current || !initialBreakSettingsRef.current) return;
 
@@ -63,7 +61,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
       const loaded = await window.electronAPI.getNotificationSettings();
       setSettings(loaded);
       
-      // Load break settings
       try {
         const loadedBreaks = await window.electronAPI.getBreakSettings();
         if (loadedBreaks) {
@@ -76,7 +73,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
       
       initialSettingsRef.current = JSON.parse(JSON.stringify(loaded));
       
-      // Load auto-start setting
       try {
         const isAutoStart = await window.electronAPI.getAutoStart();
         setAutoStart(isAutoStart);
@@ -98,7 +94,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
       await window.electronAPI.setAutoStart(newValue);
     } catch (err) {
       console.error('Failed to update auto-start:', err);
-      // Revert on failure
       setAutoStart(!newValue);
       setMessage({ type: 'error', text: 'Failed to update startup settings' });
       setTimeout(() => setMessage(null), 3000);
@@ -111,14 +106,12 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
       await window.electronAPI.updateNotificationSettings(settings);
       await window.electronAPI.updateBreakSettings(breakSettings);
       
-      // Update initial state
       initialSettingsRef.current = JSON.parse(JSON.stringify(settings));
       initialBreakSettingsRef.current = JSON.parse(JSON.stringify(breakSettings));
       setIsDirty(false);
 
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       
-      // Auto-dismiss after 3 seconds
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       console.error('Failed to save settings:', err);
@@ -156,7 +149,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
 
   return (
     <div style={{ padding: 'var(--space-6)', maxWidth: '1000px', margin: '0 auto' }} className="animate-fadeIn">
-      {/* Header */}
       <div style={{ marginBottom: 'var(--space-8)' }}>
         <h1 style={{ marginBottom: 'var(--space-2)', fontSize: '2rem', fontWeight: 800 }}>
           ⚙️ Notification Settings
@@ -166,7 +158,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
         </p>
       </div>
 
-      {/* Settings Sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
         <NotificationAlertSection
           title="Posture Alerts"
@@ -253,7 +244,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
         <StretchGuideSection onOpenStretchGuide={onOpenStretchGuide} />
       </div>
 
-      {/* Floating Action Bar */}
       <div style={{
         position: 'fixed',
         bottom: '20px',
@@ -294,7 +284,6 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenCalibration, onOpenStr
         </button>
       </div>
 
-      {/* Success/Error Toast */}
       {message && (
         <div
           role="alert"

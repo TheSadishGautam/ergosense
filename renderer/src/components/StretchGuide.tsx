@@ -26,13 +26,11 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
     const timer = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          // Move to next exercise
           if (currentExerciseIndex < routine.length - 1) {
             setCurrentExerciseIndex(currentExerciseIndex + 1);
             setCurrentStep(0);
             return routine[currentExerciseIndex + 1].duration;
           } else {
-            // Routine complete
             onComplete();
             return 0;
           }
@@ -83,7 +81,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
       flexDirection: 'column',
       padding: 'var(--space-8)',
     }}>
-      {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -118,7 +115,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
         </div>
       </div>
 
-      {/* Progress bar */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 'var(--radius-full)',
@@ -135,7 +131,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
         }} />
       </div>
 
-      {/* Main content */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -154,7 +149,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
           position: 'relative',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
         }}>
-          {/* Exercise indicator */}
           <div style={{
             position: 'absolute',
             top: 'var(--space-4)',
@@ -169,7 +163,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             {currentExerciseIndex + 1} / {routine.length}
           </div>
 
-          {/* Animation emoji */}
           <div style={{
             fontSize: '6rem',
             marginBottom: 'var(--space-4)',
@@ -178,7 +171,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             {currentExercise.animation}
           </div>
 
-          {/* Exercise name */}
           <h3 style={{
             fontSize: '2rem',
             fontWeight: 800,
@@ -189,7 +181,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             {currentExercise.name}
           </h3>
 
-          {/* Description */}
           <p style={{
             fontSize: '1rem',
             color: 'var(--text-secondary)',
@@ -199,7 +190,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             {currentExercise.description}
           </p>
 
-          {/* Timer */}
           <div style={{
             display: 'inline-block',
             padding: 'var(--space-4) var(--space-6)',
@@ -218,7 +208,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             </div>
           </div>
 
-          {/* Instructions */}
           <div style={{
             background: 'rgba(0, 0, 0, 0.3)',
             borderRadius: 'var(--radius-lg)',
@@ -252,7 +241,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
             </ol>
           </div>
 
-          {/* Controls */}
           <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
             <button
               ref={primaryActionRef}
@@ -280,7 +268,6 @@ export const StretchGuide: React.FC<StretchGuideProps> = ({ onComplete, onSnooze
         </div>
       </div>
 
-      {/* Floating animation keyframe */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px); }

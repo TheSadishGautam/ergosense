@@ -108,7 +108,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Progress Bar */}
         <div style={{
           position: 'absolute',
           top: 0,

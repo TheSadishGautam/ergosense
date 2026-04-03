@@ -1,8 +1,3 @@
-/**
- * useMetrics Hook
- * Custom hook for fetching and managing metrics data
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { MetricRecord } from '../../../models/types';
 import { calculateAverage, calculateTrend } from '../utils/chartHelpers';
@@ -49,7 +44,6 @@ export const useMetrics = (timeRange: TimeRange, refreshInterval = 60000) => {
 
   const fetchMetrics = useCallback(async (isInitialLoad = false) => {
     try {
-      // Only show loading spinner on initial load, not on refresh
       if (isInitialLoad) {
         setLoading(true);
       }
@@ -77,14 +71,13 @@ export const useMetrics = (timeRange: TimeRange, refreshInterval = 60000) => {
   }, [timeRange]);
 
   useEffect(() => {
-    fetchMetrics(true); // Initial load
+    fetchMetrics(true);
     
-    const interval = setInterval(() => fetchMetrics(false), refreshInterval); // Subsequent refreshes
+    const interval = setInterval(() => fetchMetrics(false), refreshInterval);
     
     return () => clearInterval(interval);
   }, [fetchMetrics, refreshInterval]);
 
-  // Calculate derived metrics
   const derived: DerivedMetrics = {
     avgPosture: calculateAverage(data.posture),
     avgEyeStrain: calculateAverage(data.eye),
@@ -93,7 +86,7 @@ export const useMetrics = (timeRange: TimeRange, refreshInterval = 60000) => {
     eyeTrend: calculateTrend(data.eye),
     blinkTrend: calculateTrend(data.blink),
     totalDataPoints: data.posture.length + data.eye.length + data.blink.length,
-    totalPresenceMinutes: data.presence.filter(p => p.value === 1).length, // Assuming 1 record = 1 minute
+    totalPresenceMinutes: data.presence.filter(p => p.value === 1).length,
   };
 
   return {

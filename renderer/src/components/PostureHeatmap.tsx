@@ -24,7 +24,6 @@ export const PostureHeatmap: React.FC<PostureHeatmapProps> = ({ zoneData }) => {
   const centerPercentage = getPercentage(PostureZone.CENTER);
   const totalBadPosture = 100 - centerPercentage;
 
-  // Get top 3 problematic zones
   const problemZones = Object.keys(PostureZone)
     .map(key => PostureZone[key as keyof typeof PostureZone])
     .filter(zone => zone !== PostureZone.CENTER)
@@ -35,14 +34,12 @@ export const PostureHeatmap: React.FC<PostureHeatmapProps> = ({ zoneData }) => {
 
   return (
     <div>
-      {/* Large Metric Cards Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '2fr 1fr 1fr',
         gap: 'var(--space-4)',
         marginBottom: 'var(--space-5)',
       }}>
-        {/* Main Score Card */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.05) 100%)',
           borderRadius: 'var(--radius-lg)',
@@ -74,7 +71,6 @@ export const PostureHeatmap: React.FC<PostureHeatmapProps> = ({ zoneData }) => {
           </div>
         </div>
 
-        {/* Needs Improvement */}
         <div style={{
           background: 'rgba(239, 68, 68, 0.1)',
           borderRadius: 'var(--radius-lg)',
@@ -92,7 +88,6 @@ export const PostureHeatmap: React.FC<PostureHeatmapProps> = ({ zoneData }) => {
           </div>
         </div>
 
-        {/* Total Zones */}
         <div style={{
           background: 'rgba(59, 130, 246, 0.1)',
           borderRadius: 'var(--radius-lg)',
@@ -111,7 +106,6 @@ export const PostureHeatmap: React.FC<PostureHeatmapProps> = ({ zoneData }) => {
         </div>
       </div>
 
-      {/* Problem Zones Breakdown */}
       {problemZones.length > 0 && (
         <div style={{
           background: 'rgba(17, 24, 39, 0.6)',

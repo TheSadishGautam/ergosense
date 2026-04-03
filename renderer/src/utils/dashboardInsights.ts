@@ -1,7 +1,3 @@
-/**
- * Rule-based dashboard insights (Phase 3). Pure functions — easy to test and extend.
- */
-
 export type InsightSeverity = 'critical' | 'warning' | 'positive' | 'info';
 
 export type InsightActionKind =
@@ -15,9 +11,7 @@ export interface DashboardInsight {
   title: string;
   detail: string;
   severity: InsightSeverity;
-  /** Lower = higher priority */
   priority: number;
-  /** Optional CTA wired in the app (Settings, Live, stretch, calibration). */
   action?: { label: string; kind: InsightActionKind };
 }
 

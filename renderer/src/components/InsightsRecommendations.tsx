@@ -25,7 +25,6 @@ export const InsightsRecommendations: React.FC<InsightsRecommendationsProps> = (
 }) => {
   const recommendations: Recommendation[] = [];
 
-  // Generate smart recommendations
   if (avgPosture < 0.6) {
     recommendations.push({
       category: 'Posture',
@@ -97,7 +96,6 @@ export const InsightsRecommendations: React.FC<InsightsRecommendationsProps> = (
 
   return (
     <div>
-      {/* Overall Score Banner */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(234, 88, 11, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%)',
         borderRadius: 'var(--radius-lg)',
@@ -130,7 +128,6 @@ export const InsightsRecommendations: React.FC<InsightsRecommendationsProps> = (
         </div>
       </div>
 
-      {/* Recommendations List */}
       <div style={{
         background: 'rgba(17, 24, 39, 0.6)',
         borderRadius: 'var(--radius-lg)',

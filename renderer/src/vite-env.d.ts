@@ -31,7 +31,6 @@ interface ElectronAPI {
   onCalibrationComplete: (callback: (baseline: PostureBaseline) => void) => () => void;
   onCalibrationFailed: (callback: (reason: string) => void) => () => void;
   getSystemStats: () => Promise<{ memory: number; cpu: number }>;
-  // Break Management
   getBreakSettings: () => Promise<any>;
   updateBreakSettings: (settings: any) => Promise<boolean>;
   snoozeBreak: () => Promise<boolean>;

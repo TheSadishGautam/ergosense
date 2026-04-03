@@ -8,7 +8,6 @@ import * as Sentry from '@sentry/electron/main';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 
-// Configure logging
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
 
@@ -16,16 +15,6 @@ Sentry.init({
   dsn: SENTRY_DSN,
 });
 
-// The built directory structure
-//
-// ├─┬─ dist
-// │ ├── index.html
-// │ ├── assets
-// │ └── ...
-// ├─┬─ dist-electron
-// │ ├── main.js
-// │ └── preload.js
-//
 process.env.DIST = path.join(__dirname, '../dist');
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirname, '../public');
 
@@ -64,7 +53,6 @@ const getTrustedRendererOrigins = (): string[] => {
     }
   }
 
-  // file:// is expected in packaged mode when loading local index.html.
   return ['file://'];
 };
 
@@ -101,8 +89,7 @@ const safeHandle = (
 };
 
 function createTray() {
-  const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png'); // Dev path
-  // In production, you might need to adjust this path
+  const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png');
   const icon = nativeImage.createFromPath(iconPath);
   
   tray = new Tray(icon.resize({ width: 16, height: 16 }));
@@ -132,13 +119,11 @@ function createTray() {
   });
 }
 
-// Set app name explicitly for macOS menu bar
 app.setName('ErgoSense');
 
 function createWindow() {
   const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png');
   
-  // Set dock icon for macOS
   if (process.platform === 'darwin') {
     app.dock.setIcon(nativeImage.createFromPath(iconPath));
   }
@@ -147,7 +132,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     title: 'ErgoSense',
-    icon: iconPath, // For Windows/Linux
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -155,7 +140,6 @@ function createWindow() {
     },
   });
 
-  // Handle close event to minimize to tray
   win.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
@@ -165,13 +149,10 @@ function createWindow() {
     return true;
   });
 
-  // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString());
   });
 
-  // Check for updates
-  // Check for updates
   autoUpdater.checkForUpdates();
 
   autoUpdater.on('update-available', (info) => {
@@ -182,7 +163,6 @@ function createWindow() {
     win?.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info);
   });
 
-  // Open external links in default browser and deny any in-app popup navigation.
   win.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsed = new URL(url);
@@ -190,12 +170,11 @@ function createWindow() {
         shell.openExternal(url);
       }
     } catch {
-      // Ignore malformed URLs.
+      void 0;
     }
     return { action: 'deny' };
   });
 
-  // Keep the app pinned to trusted renderer origin.
   win.webContents.on('will-navigate', (event, targetUrl) => {
     const trustedOrigins = getTrustedRendererOrigins();
     if (app.isPackaged && targetUrl.startsWith('file://')) return;
@@ -203,7 +182,7 @@ function createWindow() {
       const targetOrigin = new URL(targetUrl).origin;
       if (trustedOrigins.includes(targetOrigin)) return;
     } catch {
-      // malformed URL should be blocked
+      void 0;
     }
     event.preventDefault();
   });
@@ -237,7 +216,6 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
 
-  // Setup IPC handlers
   let isProcessingFrame = false;
 
   ipcMain.on(IPC_CHANNELS.SEND_FRAME, async (event, frame: FrameMessage) => {
@@ -247,14 +225,12 @@ app.whenReady().then(() => {
       return;
     }
 
-    if (isProcessingFrame) return; // Drop frame if busy
+    if (isProcessingFrame) return;
     
     isProcessingFrame = true;
     try {
-      // Process frame
       const result = await mlEngine.processFrame(frame);
       
-      // Send update back to renderer
       if (win && !win.isDestroyed()) {
         win.webContents.send(IPC_CHANNELS.LIVE_STATE_UPDATE, result);
       }
@@ -277,8 +253,6 @@ app.whenReady().then(() => {
     return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
   });
 
-
-  // Notification settings handlers
   safeHandle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
     return mlEngine.getStore().getNotificationSettings();
   });
@@ -294,7 +268,6 @@ app.whenReady().then(() => {
     return { success: true };
   });
 
-  // Auto-start handlers
   safeHandle(IPC_CHANNELS.GET_AUTO_START, () => {
     return app.getLoginItemSettings().openAtLogin;
   });
@@ -302,17 +275,16 @@ app.whenReady().then(() => {
   safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable: boolean) => {
     app.setLoginItemSettings({
       openAtLogin: enable,
-      openAsHidden: true, // Optional: start hidden
+      openAsHidden: true,
     });
     return true;
   });
 
-  // System Stats Handler
   safeHandle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
     const memory = await process.getProcessMemoryInfo();
     const cpu = process.getCPUUsage();
     return {
-      memory: Math.round(memory.private / 1024), // Convert KB to MB
+      memory: Math.round(memory.private / 1024),
       cpu: cpu.percentCPUUsage
     };
   });
@@ -345,7 +317,6 @@ app.whenReady().then(() => {
     return;
   });
 
-  // Break Management Handlers
   safeHandle('get-break-settings', () => {
     return breakManager.getSettings();
   });
@@ -387,7 +358,6 @@ app.whenReady().then(() => {
     return breakManager.getTimeUntilNextBreak();
   });
 
-  // Connect BreakManager events to renderer
   breakManager.on('countdown-update', (data) => {
     win?.webContents.send('break-countdown-update', data);
   });

@@ -295,7 +295,6 @@ export class MLEngine extends EventEmitter {
 
   private detectBlink(ear: number) {
     const now = Date.now();
-    // console.log(`EAR: ${ear.toFixed(3)} | State: ${this.blinkState}`);
 
     switch (this.blinkState) {
       case 'OPEN':

@@ -3,7 +3,7 @@ import { useEscapeKey } from '../hooks/useEscapeKey';
 import { Clock, Footprints, Droplets, Eye, Activity, Coffee } from 'lucide-react';
 
 interface BreakPromptProps {
-  duration: number; // recommended break duration in minutes
+  duration: number;
   onTakeBreak: () => void;
   onSnooze: () => void;
   onSkip: () => void;
@@ -73,7 +73,6 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
         animation: 'slideIn 0.4s ease',
       }}>
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
             <Clock size={48} />
@@ -99,7 +98,6 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
           </p>
         </div>
 
-        {/* Suggestion */}
         <div style={{
           padding: 'var(--space-4)',
           background: 'rgba(234, 88, 11, 0.1)',
@@ -116,7 +114,6 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <button
             ref={primaryActionRef}
@@ -182,7 +179,6 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
           </div>
         </div>
 
-        {/* Info */}
         <div style={{
           marginTop: 'var(--space-4)',
           paddingTop: 'var(--space-4)',

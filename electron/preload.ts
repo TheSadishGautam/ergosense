@@ -54,7 +54,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_FAILED, subscription);
     };
   },
-  // Break Management
   getBreakSettings: () => ipcRenderer.invoke('get-break-settings'),
   updateBreakSettings: (settings: any) => ipcRenderer.invoke('update-break-settings', settings),
   snoozeBreak: () => ipcRenderer.invoke('snooze-break'),

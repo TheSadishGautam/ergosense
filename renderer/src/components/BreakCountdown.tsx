@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface BreakCountdownProps {
-  timeRemaining: number; // seconds until next break
+  timeRemaining: number;
   isQuietMode?: boolean;
   onViewDetails?: () => void;
 }
@@ -44,19 +44,16 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
     );
   }
 
-  // Convert seconds to minutes
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
   
-  // Color progression: green → yellow → red
-  let color = '#10b981'; // green
+  let color = '#10b981';
   if (minutes < 5) {
-    color = '#ef4444'; // red
+    color = '#ef4444';
   } else if (minutes < 15) {
-    color = '#f59e0b'; // yellow
+    color = '#f59e0b';
   }
   
-  // Format time display
   const timeText = minutes > 0 
     ? `${minutes}:${seconds.toString().padStart(2, '0')}`
     : `${seconds}s`;

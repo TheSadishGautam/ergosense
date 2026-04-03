@@ -71,7 +71,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         } as React.CSSProperties
       }
     >
-      {/* Gradient Glow Effect */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -81,7 +80,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         background: `linear-gradient(90deg, ${accent} 0%, transparent 100%)`,
       }} />
 
-      {/* Icon Background Blur */}
       {icon && (
         <div style={{
           position: 'absolute',
@@ -96,7 +94,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       )}
 
       <div style={{ position: 'relative', zIndex: 1 }}>
-        {/* Header */}
         <div className="flex justify-between items-start" style={{ marginBottom: 'var(--space-4)' }}>
           <div style={{ flex: 1 }}>
             <div style={{ 
@@ -129,7 +126,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           )}
         </div>
 
-        {/* Value Display */}
         <div className="flex items-end justify-between" style={{ marginBottom: 'var(--space-2)' }}>
           <div className="flex items-baseline gap-2">
             <div style={{ 
@@ -174,7 +170,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           )}
         </div>
 
-        {/* Status Bar */}
         <div style={{
           width: '100%',
           height: '4px',
@@ -192,7 +187,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           }} />
         </div>
 
-        {/* Alert Message */}
         {status !== 'good' && status !== 'excellent' && (
           <div style={{
             marginTop: 'var(--space-3)',

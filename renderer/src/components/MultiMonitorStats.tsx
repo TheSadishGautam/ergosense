@@ -59,7 +59,6 @@ export const MultiMonitorStats: React.FC<MultiMonitorStatsProps> = ({ timeRange 
       padding: 'var(--space-6)',
       border: '1px solid rgba(255, 255, 255, 0.1)',
     }}>
-      {/* Header */}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -87,7 +86,6 @@ export const MultiMonitorStats: React.FC<MultiMonitorStatsProps> = ({ timeRange 
         </h3>
       </div>
 
-      {/* Position Distribution */}
       <div style={{ marginBottom: 'var(--space-5)' }}>
         {metrics.data.map((item: MonitorGazeData) => {
           if (item.percentage < 0.5) return null;
@@ -138,7 +136,6 @@ export const MultiMonitorStats: React.FC<MultiMonitorStatsProps> = ({ timeRange 
         })}
       </div>
 
-      {/* Stats Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',

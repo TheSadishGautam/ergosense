@@ -60,9 +60,8 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
   };
 
   const posturePercentage = state.postureScore * 100;
-  const eyePercentage = (1 - state.eyeStrainScore) * 100; // Invert for display
+  const eyePercentage = (1 - state.eyeStrainScore) * 100;
 
-  // SVG circle parameters
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
 
@@ -72,7 +71,6 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
 
   return (
     <section style={{ minWidth: '450px' }} className="animate-fadeIn" aria-label="Live health status panel">
-      {/* Alert Banner */}
       {(state.postureScore < 0.4 || (state.blinkRate && state.blinkRate < 10)) && (
         <div className="card" role="alert" style={{
           background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%)',
@@ -95,7 +93,6 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
         </div>
       )}
 
-      {/* Main Status Card */}
       <div className="card">
         <h3 style={{ 
           marginBottom: 'var(--space-6)', 
@@ -108,9 +105,7 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
           Live Monitoring
         </h3>
 
-        {/* Progress Circles */}
         <div className="flex justify-around" style={{ marginBottom: 'var(--space-6)' }}>
-          {/* Posture Circle */}
           <div style={{ textAlign: 'center' }}>
             <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }} role="img" aria-label={`Posture ${Math.round(posturePercentage)} percent`}>
               <circle
@@ -169,7 +164,6 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
             </div>
           </div>
 
-          {/* Eye Health Circle */}
           <div style={{ textAlign: 'center' }}>
             <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }} role="img" aria-label={`Eye health ${Math.round(eyePercentage)} percent`}>
               <circle
@@ -229,7 +223,6 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
           </div>
         </div>
 
-        {/* Metrics Grid */}
         <div style={{ 
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -340,7 +333,6 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
           </div>
         </div>
 
-        {/* Recommendations */}
         {(state.blinkRate && state.blinkRate < 12) && (
           <div style={{
             padding: 'var(--space-4)',
