@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { FrameMessage, LiveState, PostureBaseline, PostureZone } from '../../models/types';
 import { PoseModel } from './poseModel';
 import { FaceModel } from './faceModel';
@@ -5,7 +6,7 @@ import { calculatePostureMetrics, calculateEyeMetrics, detectPostureZone, calcul
 import { MetricStore } from '../db/store';
 import { NotificationManager } from '../services/NotificationManager';
 
-export class MLEngine {
+export class MLEngine extends EventEmitter {
   private poseModel: PoseModel;
   private faceModel: FaceModel;
   private lastState: Partial<LiveState> = {
@@ -51,6 +52,8 @@ export class MLEngine {
   } = { shoulderAngles: [], neckAngles: [], headTilts: [], distances: [] };
   private calibrationStartTime: number = 0;
   private readonly CALIBRATION_DURATION_MS = 60000; // 60 seconds
+  private readonly MIN_CALIBRATION_SAMPLES = 30;
+  private calibrationTickTimer: ReturnType<typeof setInterval> | null = null;
 
   // Zone tracking
   private zoneDistribution: Map<PostureZone, number> = new Map();
@@ -70,6 +73,7 @@ export class MLEngine {
 
 
   constructor() {
+    super();
     this.poseModel = new PoseModel();
     this.poseModel.load();
     this.faceModel = new FaceModel();
@@ -498,7 +502,27 @@ export class MLEngine {
     this.blinkCountInInterval = 0;
   }
 
+  private clearCalibrationTimer() {
+    if (this.calibrationTickTimer) {
+      clearInterval(this.calibrationTickTimer);
+      this.calibrationTickTimer = null;
+    }
+  }
+
+  /** Stops calibration without saving (user cancelled or new session started). */
+  public cancelCalibration() {
+    this.clearCalibrationTimer();
+    this.isCalibrating = false;
+    this.calibrationData = {
+      shoulderAngles: [],
+      neckAngles: [],
+      headTilts: [],
+      distances: [],
+    };
+  }
+
   public startCalibration() {
+    this.cancelCalibration();
     console.log('Starting posture calibration...');
     this.isCalibrating = true;
     this.calibrationStartTime = Date.now();
@@ -508,18 +532,22 @@ export class MLEngine {
       headTilts: [],
       distances: [],
     };
+
+    this.calibrationTickTimer = setInterval(() => {
+      if (!this.isCalibrating) return;
+      const elapsed = Date.now() - this.calibrationStartTime;
+      this.emit('calibration-progress', Math.min(100, (elapsed / this.CALIBRATION_DURATION_MS) * 100));
+      if (elapsed >= this.CALIBRATION_DURATION_MS) {
+        this.completeCalibration();
+      }
+    }, 250);
   }
 
   private processCalibrationData(keypoints: any[]) {
     if (!this.isCalibrating) return;
 
     const elapsed = Date.now() - this.calibrationStartTime;
-    
-    // Check if calibration is complete
-    if (elapsed >= this.CALIBRATION_DURATION_MS) {
-      this.completeCalibration();
-      return;
-    }
+    if (elapsed >= this.CALIBRATION_DURATION_MS) return;
 
     // Extract calibration metrics from keypoints
     const { neckAngle } = calculatePostureMetrics(keypoints);
@@ -560,8 +588,22 @@ export class MLEngine {
   }
 
   private completeCalibration() {
-    console.log('Completing calibration...');
+    if (!this.isCalibrating) return;
+
+    this.clearCalibrationTimer();
     this.isCalibrating = false;
+
+    const sampleCount = this.calibrationData.neckAngles.length;
+    if (sampleCount < this.MIN_CALIBRATION_SAMPLES) {
+      console.warn('Calibration failed: insufficient samples', sampleCount);
+      this.emit(
+        'calibration-failed',
+        'Not enough pose samples. Stay visible in frame and face the camera for the full 60 seconds.'
+      );
+      return;
+    }
+
+    console.log('Completing calibration...');
 
     // Calculate averages
     const avgShoulder = this.calibrationData.shoulderAngles.length > 0
@@ -592,6 +634,7 @@ export class MLEngine {
     // Save to database
     this.db.setPostureBaseline(baseline);
     console.log('Calibration complete:', baseline);
+    this.emit('calibration-complete', baseline);
   }
 }
 

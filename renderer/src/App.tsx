@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback, useTransition, lazy, Suspense } from 'react';
 import { WebcamView } from './components/WebcamView';
 import { StatusHUD } from './components/StatusHUD';
-import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
+import { DashboardSkeleton } from './components/dashboardSections';
 import { Onboarding } from './components/Onboarding';
 import { UpdateBanner } from './components/UpdateBanner';
 import { CalibrationView } from './components/CalibrationView';
@@ -18,8 +18,17 @@ import { useOnboarding } from './hooks/useOnboarding';
 import { usePostureStretch } from './hooks/usePostureStretch';
 import './styles.css';
 
+const Dashboard = lazy(() =>
+  import('./components/Dashboard').then((m) => ({ default: m.Dashboard }))
+);
+
 function App() {
   const [view, setView] = useState<AppView>('LIVE');
+  const [, startViewTransition] = useTransition();
+
+  const setViewNav = useCallback((next: AppView) => {
+    startViewTransition(() => setView(next));
+  }, []);
   const [showCalibration, setShowCalibration] = useState(false);
   const { loading, showOnboarding, completeOnboarding } = useOnboarding();
   const { liveState, showUpdateBanner, dismissUpdateBanner } = useLiveState();
@@ -65,7 +74,7 @@ function App() {
   return (
     <AppShell
       view={view}
-      onViewChange={setView}
+      onViewChange={setViewNav}
       footerContent={
         <div className="flex justify-between items-center">
           <div>ErgoSense v1.0 • Desktop Ergonomics Assistant</div>
@@ -125,7 +134,7 @@ function App() {
                 >
                   Camera Feed
                 </h2>
-                <WebcamView />
+                <WebcamView suspendWhen={showCalibration} />
                 <div
                   style={{
                     marginTop: 'var(--space-4)',
@@ -183,7 +192,15 @@ function App() {
         aria-hidden={view !== 'DASHBOARD'}
         style={{ display: view === 'DASHBOARD' ? 'block' : 'none' }}
       >
-        <Dashboard />
+        {view === 'DASHBOARD' ? (
+          <Suspense fallback={<DashboardSkeleton />}>
+            <Dashboard
+              onNavigate={setViewNav}
+              onOpenStretchGuide={openStretchGuide}
+              onOpenCalibration={() => setShowCalibration(true)}
+            />
+          </Suspense>
+        ) : null}
       </section>
       <section
         id="panel-settings"
@@ -192,14 +209,16 @@ function App() {
         aria-hidden={view !== 'SETTINGS'}
         style={{ display: view === 'SETTINGS' ? 'block' : 'none' }}
       >
-        <Settings onOpenCalibration={() => setShowCalibration(true)} onOpenStretchGuide={openStretchGuide} />
+        {view === 'SETTINGS' ? (
+          <Settings onOpenCalibration={() => setShowCalibration(true)} onOpenStretchGuide={openStretchGuide} />
+        ) : null}
       </section>
 
       {showBreakCountdown && view === 'LIVE' && (
         <BreakCountdown
           timeRemaining={timeUntilBreak}
           isQuietMode={isQuietMode}
-          onViewDetails={() => setView('SETTINGS')}
+          onViewDetails={() => setViewNav('SETTINGS')}
         />
       )}
 

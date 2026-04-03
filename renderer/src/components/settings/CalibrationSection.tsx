@@ -47,6 +47,7 @@ export const CalibrationSection: React.FC<CalibrationSectionProps> = ({ onOpenCa
       </div>
 
       <button
+        type="button"
         onClick={onOpenCalibration}
         className="btn"
         style={{

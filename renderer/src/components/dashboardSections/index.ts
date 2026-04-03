@@ -6,5 +6,6 @@ export { DashboardTrendsSection } from './DashboardTrendsSection';
 export { DashboardDistributionSection } from './DashboardDistributionSection';
 export { DashboardInsightsSection } from './DashboardInsightsSection';
 export { DashboardSpatialSection } from './DashboardSpatialSection';
+export { DashboardWeeklySummarySection } from './DashboardWeeklySummarySection';
 
 export { DashboardSkeleton } from './DashboardSkeleton';

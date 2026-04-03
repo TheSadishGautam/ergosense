@@ -13,7 +13,10 @@ export const IPC_CHANNELS = {
   UPDATE_AVAILABLE: 'update-available',
   UPDATE_DOWNLOADED: 'update-downloaded',
   START_CALIBRATION: 'start-calibration',
+  CANCEL_CALIBRATION: 'cancel-calibration',
   CALIBRATION_PROGRESS: 'calibration-progress',
+  CALIBRATION_COMPLETE: 'calibration-complete',
+  CALIBRATION_FAILED: 'calibration-failed',
   GET_POSTURE_BASELINE: 'get-posture-baseline',
   SET_POSTURE_BASELINE: 'set-posture-baseline',
 } as const;

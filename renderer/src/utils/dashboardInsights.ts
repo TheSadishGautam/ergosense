@@ -4,6 +4,12 @@
 
 export type InsightSeverity = 'critical' | 'warning' | 'positive' | 'info';
 
+export type InsightActionKind =
+  | 'navigate-settings'
+  | 'navigate-live'
+  | 'open-stretch'
+  | 'open-calibration';
+
 export interface DashboardInsight {
   id: string;
   title: string;
@@ -11,6 +17,8 @@ export interface DashboardInsight {
   severity: InsightSeverity;
   /** Lower = higher priority */
   priority: number;
+  /** Optional CTA wired in the app (Settings, Live, stretch, calibration). */
+  action?: { label: string; kind: InsightActionKind };
 }
 
 export interface DashboardInsightsInput {
@@ -35,6 +43,7 @@ const GENERIC_TIPS: DashboardInsight[] = [
     detail: 'Every 20 minutes, look at something ~20 feet away for 20 seconds to relax eye focus.',
     severity: 'info',
     priority: 90,
+    action: { label: 'Break settings', kind: 'navigate-settings' },
   },
   {
     id: 'generic-monitor-height',
@@ -42,6 +51,7 @@ const GENERIC_TIPS: DashboardInsight[] = [
     detail: 'Top of the screen at or slightly below eye level reduces neck strain.',
     severity: 'info',
     priority: 91,
+    action: { label: 'Open settings', kind: 'navigate-settings' },
   },
   {
     id: 'generic-microbreaks',
@@ -49,6 +59,7 @@ const GENERIC_TIPS: DashboardInsight[] = [
     detail: 'Stand, stretch, or walk for 1–2 minutes each hour to reset posture and circulation.',
     severity: 'info',
     priority: 92,
+    action: { label: 'Stretch guide', kind: 'open-stretch' },
   },
 ];
 
@@ -102,6 +113,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: 'Average posture score is low. Reset your chair, screen height, and sit with shoulders relaxed.',
       severity: 'critical',
       priority: 1,
+      action: { label: 'Run calibration', kind: 'open-calibration' },
     });
   } else if (postureTrend < -8) {
     rules.push({
@@ -110,6 +122,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: `Recent posture is ~${Math.abs(postureTrend).toFixed(0)}% worse than earlier in this window. Check ergonomics before fatigue sets in.`,
       severity: 'warning',
       priority: 10,
+      action: { label: 'View live feedback', kind: 'navigate-live' },
     });
   }
 
@@ -120,6 +133,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: 'Reduce continuous focus time: use timed breaks, lower brightness, and increase viewing distance.',
       severity: 'critical',
       priority: 2,
+      action: { label: 'Break & display settings', kind: 'navigate-settings' },
     });
   } else if (eyeTrend > 8) {
     rules.push({
@@ -128,6 +142,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: `Strain is ~${eyeTrend.toFixed(0)}% higher in recent samples — add short eye breaks now.`,
       severity: 'warning',
       priority: 11,
+      action: { label: 'Go to Live', kind: 'navigate-live' },
     });
   }
 
@@ -138,6 +153,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: 'Aim for 12–20 blinks/min. Consciously blink during reading or deep focus tasks.',
       severity: 'warning',
       priority: 3,
+      action: { label: 'Notification settings', kind: 'navigate-settings' },
     });
   } else if (blinkTrend < -8) {
     rules.push({
@@ -146,6 +162,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: `Blink rate is ~${Math.abs(blinkTrend).toFixed(0)}% lower in recent samples — hydrate and take a short screen break.`,
       severity: 'warning',
       priority: 12,
+      action: { label: 'View Live', kind: 'navigate-live' },
     });
   }
 
@@ -157,6 +174,7 @@ export const buildDashboardInsights = (input: DashboardInsightsInput): Dashboard
       detail: 'Keep this rhythm: micro-breaks and calibration will help maintain gains.',
       severity: 'positive',
       priority: 50,
+      action: { label: 'Stretch guide', kind: 'open-stretch' },
     });
   }
 

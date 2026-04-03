@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, IpcMainEve
 import path from 'node:path';
 import { IPC_CHANNELS } from './ipc';
 import { MLEngine } from './mlEngine';
-import { FrameMessage } from '../models/types';
+import { FrameMessage, PostureBaseline } from '../models/types';
 import { SENTRY_DSN } from '../models/constants';
 import * as Sentry from '@sentry/electron/main';
 import log from 'electron-log';
@@ -37,6 +37,22 @@ let isQuitting = false;
 
 const mlEngine = new MLEngine();
 const breakManager = new BreakManager(mlEngine.getStore());
+
+mlEngine.on('calibration-progress', (p: number) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CALIBRATION_PROGRESS, p);
+  }
+});
+mlEngine.on('calibration-complete', (baseline: PostureBaseline) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CALIBRATION_COMPLETE, baseline);
+  }
+});
+mlEngine.on('calibration-failed', (reason: string) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CALIBRATION_FAILED, reason);
+  }
+});
 
 const getTrustedRendererOrigins = (): string[] => {
   const devUrl = process.env.VITE_DEV_SERVER_URL;
@@ -315,6 +331,11 @@ app.whenReady().then(() => {
     return;
   });
 
+  safeHandle(IPC_CHANNELS.CANCEL_CALIBRATION, async () => {
+    mlEngine.cancelCalibration();
+    return true;
+  });
+
   safeHandle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
     return mlEngine.getStore().getPostureBaseline();
   });
@@ -356,6 +377,10 @@ app.whenReady().then(() => {
 
   safeHandle('get-break-stats', (event, days) => {
     return mlEngine.getStore().getBreakStats(days || 7);
+  });
+
+  safeHandle('get-break-history-window', (event, timeWindowMs: number) => {
+    return mlEngine.getStore().getBreakHistoryInWindow(typeof timeWindowMs === 'number' ? timeWindowMs : 86_400_000);
   });
 
   safeHandle('get-time-until-break', () => {

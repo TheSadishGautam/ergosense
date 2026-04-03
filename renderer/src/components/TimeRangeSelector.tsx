@@ -21,17 +21,24 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
   onChange,
 }) => {
   return (
-    <div className="flex gap-2" style={{ 
-      background: 'rgba(255, 255, 255, 0.1)',
-      padding: 'var(--space-1)',
-      borderRadius: 'var(--radius-lg)',
-      backdropFilter: 'blur(10px)',
-    }}>
-      {ranges.map(range => (
+    <div
+      className="flex gap-2"
+      role="group"
+      aria-label="Dashboard time range"
+      style={{
+        background: 'rgba(255, 255, 255, 0.1)',
+        padding: 'var(--space-1)',
+        borderRadius: 'var(--radius-lg)',
+        backdropFilter: 'blur(10px)',
+      }}
+    >
+      {ranges.map((range) => (
         <button
           key={range.value}
+          type="button"
           onClick={() => onChange(range.value)}
           className="btn btn-sm"
+          aria-pressed={selected === range.value}
           style={{
             background: selected === range.value 
               ? 'var(--gradient-orange)' 

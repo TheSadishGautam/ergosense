@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import { TrendingUp, Zap } from 'lucide-react';
 import { CustomTooltip } from '../CustomTooltip';
@@ -17,22 +18,30 @@ import { formatTime } from '../../utils/chartHelpers';
 import { MetricRecord } from '../../../../models/types';
 import { CombinedMetricPoint, CompareAlignedSeries } from '../../utils/metricsMerge';
 import { CHART } from '../../utils/theme';
+import { BreakChartMarker } from '../../utils/breakChartMarkers';
+
+const MAX_BREAK_MARKERS = 64;
 
 export interface DashboardTrendsSectionProps {
   combinedData: CombinedMetricPoint[];
   blinkSeries: MetricRecord[];
   /** When set (compare mode loaded), charts overlay previous period on the same time axis */
   compareChartData: CompareAlignedSeries | null;
+  /** Vertical markers for scheduled vs taken breaks (same x-axis as metrics) */
+  breakMarkers: BreakChartMarker[];
 }
 
 export const DashboardTrendsSection: React.FC<DashboardTrendsSectionProps> = ({
   combinedData,
   blinkSeries,
   compareChartData,
+  breakMarkers,
 }) => {
   const useCompare = Boolean(compareChartData);
   const postureEyeData = useCompare ? compareChartData!.combined : combinedData;
   const blinkChartData = useCompare ? compareChartData!.blink : blinkSeries;
+  const markers = breakMarkers.slice(0, MAX_BREAK_MARKERS);
+  const hasBreakOverlay = markers.length > 0;
 
   return (
     <div
@@ -60,11 +69,17 @@ export const DashboardTrendsSection: React.FC<DashboardTrendsSectionProps> = ({
             <TrendingUp size={20} />
           </div>
           <h3 style={{ fontSize: '1.125rem', margin: 0, fontWeight: 700 }}>
-            Posture & Eye Strain Trends
+            Posture & eye strain trends
             {useCompare && (
               <span className="dashboard-chart-compare-caption" style={{ fontWeight: 500 }}>
                 {' '}
                 (solid = current, dashed = previous period)
+              </span>
+            )}
+            {hasBreakOverlay && (
+              <span className="dashboard-chart-break-caption" style={{ fontWeight: 500 }}>
+                {' '}
+                · Gray = break due, green = break taken
               </span>
             )}
           </h3>
@@ -137,6 +152,15 @@ export const DashboardTrendsSection: React.FC<DashboardTrendsSectionProps> = ({
                 />
               </>
             )}
+            {markers.map((m, i) => (
+              <ReferenceLine
+                key={`pe-break-${m.timestamp}-${m.variant}-${i}`}
+                x={m.timestamp}
+                stroke={m.variant === 'taken' ? '#22c55e' : '#94a3b8'}
+                strokeDasharray={m.variant === 'taken' ? undefined : '4 4'}
+                strokeOpacity={0.9}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </section>
@@ -191,6 +215,15 @@ export const DashboardTrendsSection: React.FC<DashboardTrendsSectionProps> = ({
             ) : (
               <Bar dataKey="value" fill={CHART.barBlink} name="Blinks/min" radius={[8, 8, 0, 0]} />
             )}
+            {markers.map((m, i) => (
+              <ReferenceLine
+                key={`bl-break-${m.timestamp}-${m.variant}-${i}`}
+                x={m.timestamp}
+                stroke={m.variant === 'taken' ? '#22c55e' : '#94a3b8'}
+                strokeDasharray={m.variant === 'taken' ? undefined : '4 4'}
+                strokeOpacity={0.9}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
         <div

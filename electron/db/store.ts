@@ -334,6 +334,15 @@ export class MetricStore {
     return stmt.all(since) as any[];
   }
 
+  /** Break rows in [now - windowMs, now], ascending by scheduled time (for dashboard timeline overlay). */
+  public getBreakHistoryInWindow(timeWindowMs: number): any[] {
+    const since = Date.now() - timeWindowMs;
+    const stmt = this.db.prepare(
+      'SELECT * FROM break_history WHERE scheduled_time >= ? ORDER BY scheduled_time ASC'
+    );
+    return stmt.all(since) as any[];
+  }
+
   public getBreakStats(days: number = 7): {
     totalScheduled: number;
     totalTaken: number;

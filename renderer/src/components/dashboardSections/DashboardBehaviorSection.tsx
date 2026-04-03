@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Eye, Zap, Clock, Calendar } from 'lucide-react';
+import { Activity, Eye, Zap, Clock, Calendar, Coffee } from 'lucide-react';
 import { MetricCard } from '../MetricCard';
 import { getPostureStatus, getEyeStatus, getBlinkStatus } from '../../utils/statusHelpers';
 import { TimeRange } from '../../hooks/useMetrics';
@@ -14,9 +14,14 @@ export interface DerivedSnapshot {
   totalPresenceMinutes: number;
 }
 
+export interface BreakAdherenceSnapshot {
+  scheduled: number;
+  taken: number;
+  adherencePct: number | null;
+}
+
 export interface DashboardBehaviorSectionProps {
   derived: DerivedSnapshot;
-  ergonomicScore: number;
   timeRange: TimeRange;
   comparisonDeltas?: {
     posture: number;
@@ -25,13 +30,14 @@ export interface DashboardBehaviorSectionProps {
     ergonomic: number;
     focusMinutes: number;
   } | null;
+  breakAdherence: BreakAdherenceSnapshot | null;
 }
 
 export const DashboardBehaviorSection: React.FC<DashboardBehaviorSectionProps> = ({
   derived,
-  ergonomicScore,
   timeRange,
   comparisonDeltas,
+  breakAdherence,
 }) => (
   <>
     <div className="dashboard-grid dashboard-grid--3" style={{ marginBottom: 'var(--space-8)' }}>
@@ -73,26 +79,7 @@ export const DashboardBehaviorSection: React.FC<DashboardBehaviorSectionProps> =
     <div className="dashboard-grid dashboard-grid--3" style={{ marginBottom: 'var(--space-8)' }}>
       <div className="card-glass" style={{ animation: 'none' }}>
         <MetricCard
-          title="Ergonomic Score"
-          value={(ergonomicScore * 100).toFixed(0)}
-          unit="/100"
-          trend={comparisonDeltas ? comparisonDeltas.ergonomic : undefined}
-          status={
-            ergonomicScore >= 0.85
-              ? 'excellent'
-              : ergonomicScore >= 0.7
-                ? 'good'
-                : ergonomicScore >= 0.5
-                  ? 'warning'
-                  : 'danger'
-          }
-          icon={<Activity />}
-          subtitle={comparisonDeltas ? 'Vs previous period' : 'Overall health index'}
-        />
-      </div>
-      <div className="card-glass" style={{ animation: 'none' }}>
-        <MetricCard
-          title="Focus Time"
+          title="Focus time"
           value={derived.totalPresenceMinutes}
           unit="min"
           trend={comparisonDeltas ? comparisonDeltas.focusMinutes : undefined}
@@ -102,7 +89,33 @@ export const DashboardBehaviorSection: React.FC<DashboardBehaviorSectionProps> =
         />
       </div>
       <div className="card-glass" style={{ animation: 'none' }}>
-        <MetricCard title="Time Range" value={timeRange} icon={<Calendar />} subtitle="Time range displayed" />
+        <MetricCard
+          title="Break reminders"
+          value={
+            breakAdherence && breakAdherence.scheduled > 0 && breakAdherence.adherencePct != null
+              ? breakAdherence.adherencePct.toFixed(0)
+              : '—'
+          }
+          unit={breakAdherence && breakAdherence.scheduled > 0 ? '% taken' : ''}
+          icon={<Coffee />}
+          subtitle={
+            breakAdherence && breakAdherence.scheduled > 0
+              ? `${breakAdherence.taken} of ${breakAdherence.scheduled} taken in range`
+              : 'No break events in this window yet'
+          }
+          status={
+            breakAdherence?.adherencePct == null
+              ? 'good'
+              : breakAdherence.adherencePct >= 70
+                ? 'excellent'
+                : breakAdherence.adherencePct >= 45
+                  ? 'warning'
+                  : 'danger'
+          }
+        />
+      </div>
+      <div className="card-glass" style={{ animation: 'none' }}>
+        <MetricCard title="Time range" value={timeRange} icon={<Calendar />} subtitle="Dashboard window" />
       </div>
     </div>
   </>

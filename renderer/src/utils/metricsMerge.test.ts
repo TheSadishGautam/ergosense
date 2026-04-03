@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { MetricRecord } from '../../../models/types';
-import { mergeMetricSeriesByMinute, buildCompareAlignedSeries } from './metricsMerge';
+import { mergeMetricSeriesByMinute, buildCompareAlignedSeries, chartBucketMsForWindow, aggregateBlinkSeriesForChart } from './metricsMerge';
 
 describe('mergeMetricSeriesByMinute', () => {
   it('aligns two metric streams by minute bucket', () => {
@@ -63,5 +63,32 @@ describe('buildCompareAlignedSeries', () => {
 
     expect(blinkRows[0].value).toBe(14);
     expect(blinkRows[0].valuePrev).toBe(10);
+  });
+});
+
+describe('chartBucketMsForWindow', () => {
+  it('keeps 1-minute buckets for 24H window', () => {
+    const ms24 = 24 * 60 * 60 * 1000;
+    expect(chartBucketMsForWindow(ms24)).toBe(60_000);
+  });
+
+  it('uses larger buckets for 7D window to cap point count', () => {
+    const ms7 = 7 * 24 * 60 * 60 * 1000;
+    expect(chartBucketMsForWindow(ms7)).toBeGreaterThan(60_000);
+    const bucket = chartBucketMsForWindow(ms7);
+    expect(Math.ceil(ms7 / bucket)).toBeLessThanOrEqual(420);
+  });
+});
+
+describe('aggregateBlinkSeriesForChart', () => {
+  it('downsamples blink rows for long windows', () => {
+    const ms7 = 7 * 24 * 60 * 60 * 1000;
+    const t0 = 1_700_000_000_000;
+    const blink: MetricRecord[] = [];
+    for (let t = t0; t < t0 + ms7; t += 60_000) {
+      blink.push({ id: blink.length, timestamp: t, type: 'BLINK', value: 12, metadata: '' });
+    }
+    const agg = aggregateBlinkSeriesForChart(blink, ms7);
+    expect(agg.length).toBeLessThanOrEqual(420);
   });
 });
