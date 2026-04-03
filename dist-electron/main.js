@@ -25,7 +25,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 const electron = require("electron");
 const path$q = require("node:path");
-const ort = require("onnxruntime-node");
+const require$$0$1 = require("events");
 const Database = require("better-sqlite3");
 const path$r = require("path");
 const require$$1$5 = require("fs");
@@ -38,14 +38,13 @@ const util$5 = require("node:util");
 const os$3 = require("node:os");
 const require$$3 = require("worker_threads");
 const perf_hooks$2 = require("perf_hooks");
-const require$$0$1 = require("util");
+const require$$0$2 = require("util");
 const require$$1$6 = require("async_hooks");
-const require$$0$3 = require("events");
 const diagch$1 = require("diagnostics_channel");
 const moduleModule = require("module");
 const require$$1$3 = require("tty");
 const require$$1$4 = require("os");
-const require$$0$2 = require("node:fs");
+const require$$0$3 = require("node:fs");
 const node_readline = require("node:readline");
 const node_worker_threads = require("node:worker_threads");
 const require$$0$5 = require("child_process");
@@ -73,7 +72,6 @@ function _interopNamespaceDefault(e) {
   return Object.freeze(n);
 }
 const electron__namespace = /* @__PURE__ */ _interopNamespaceDefault(electron);
-const ort__namespace = /* @__PURE__ */ _interopNamespaceDefault(ort);
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path$r);
 const urlModule__namespace = /* @__PURE__ */ _interopNamespaceDefault(urlModule);
 const diagnosticsChannel__namespace = /* @__PURE__ */ _interopNamespaceDefault(diagnosticsChannel);
@@ -94,10 +92,28 @@ const IPC_CHANNELS = {
   UPDATE_AVAILABLE: "update-available",
   UPDATE_DOWNLOADED: "update-downloaded",
   START_CALIBRATION: "start-calibration",
+  CANCEL_CALIBRATION: "cancel-calibration",
   CALIBRATION_PROGRESS: "calibration-progress",
+  CALIBRATION_COMPLETE: "calibration-complete",
+  CALIBRATION_FAILED: "calibration-failed",
   GET_POSTURE_BASELINE: "get-posture-baseline",
   SET_POSTURE_BASELINE: "set-posture-baseline"
 };
+let ort$1;
+try {
+  ort$1 = require("onnxruntime-node");
+} catch (e) {
+  if (process.platform === "win32") {
+    electron.dialog.showErrorBox(
+      "Missing System Dependency",
+      'ErgoSense requires the Visual C++ Redistributable to run.\n\nPlease install "Visual C++ Redistributable for Visual Studio 2015-2022" and try again.\n\nError: ' + e.message
+    );
+    electron.app.quit();
+    process.exit(1);
+  } else {
+    throw e;
+  }
+}
 const MODEL_PATH$1 = electron.app.isPackaged ? path$q.join(process.resourcesPath, "resources", "movenet_lightning.onnx") : path$q.join(__dirname, "../resources/movenet_lightning.onnx");
 class PoseModel {
   constructor() {
@@ -107,7 +123,7 @@ class PoseModel {
   async load() {
     console.log("Attempting to load model from:", MODEL_PATH$1);
     try {
-      this.session = await ort__namespace.InferenceSession.create(MODEL_PATH$1);
+      this.session = await ort$1.InferenceSession.create(MODEL_PATH$1);
       this.inputName = this.session.inputNames[0];
       console.log("Pose model loaded successfully");
     } catch (e) {
@@ -145,7 +161,7 @@ class PoseModel {
         int32Data[dstIdx + 2] = data[srcIdx + 2];
       }
     }
-    return new ort__namespace.Tensor("int32", int32Data, [1, 192, 192, 3]);
+    return new ort$1.Tensor("int32", int32Data, [1, 192, 192, 3]);
   }
   postprocess(data) {
     const keypoints = [];
@@ -160,6 +176,21 @@ class PoseModel {
     return keypoints;
   }
 }
+let ort;
+try {
+  ort = require("onnxruntime-node");
+} catch (e) {
+  if (process.platform === "win32") {
+    electron.dialog.showErrorBox(
+      "Missing System Dependency",
+      'ErgoSense requires the Visual C++ Redistributable to run.\n\nPlease install "Visual C++ Redistributable for Visual Studio 2015-2022" and try again.\n\nError: ' + e.message
+    );
+    electron.app.quit();
+    process.exit(1);
+  } else {
+    throw e;
+  }
+}
 const MODEL_PATH = electron.app.isPackaged ? path$q.join(process.resourcesPath, "resources", "face_mesh.onnx") : path$q.join(__dirname, "../resources/face_mesh.onnx");
 class FaceModel {
   constructor() {
@@ -169,7 +200,7 @@ class FaceModel {
   async load() {
     console.log("Attempting to load face model from:", MODEL_PATH);
     try {
-      this.session = await ort__namespace.InferenceSession.create(MODEL_PATH);
+      this.session = await ort.InferenceSession.create(MODEL_PATH);
       this.inputName = this.session.inputNames[0];
       console.log("Face model loaded successfully");
       console.log("Input names:", this.session.inputNames);
@@ -207,12 +238,12 @@ class FaceModel {
       const tensor = this.preprocess(frame, cropRect);
       const feeds = {};
       feeds[this.inputName] = tensor;
-      feeds["crop_x1"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.x)]), [1, 1]);
-      feeds["crop_y1"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.y)]), [1, 1]);
-      feeds["crop_x2"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.x + cropRect.width)]), [1, 1]);
-      feeds["crop_y2"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.y + cropRect.height)]), [1, 1]);
-      feeds["crop_width"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.width)]), [1, 1]);
-      feeds["crop_height"] = new ort__namespace.Tensor("int32", new Int32Array([Math.floor(cropRect.height)]), [1, 1]);
+      feeds["crop_x1"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.x)]), [1, 1]);
+      feeds["crop_y1"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.y)]), [1, 1]);
+      feeds["crop_x2"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.x + cropRect.width)]), [1, 1]);
+      feeds["crop_y2"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.y + cropRect.height)]), [1, 1]);
+      feeds["crop_width"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.width)]), [1, 1]);
+      feeds["crop_height"] = new ort.Tensor("int32", new Int32Array([Math.floor(cropRect.height)]), [1, 1]);
       const results = await this.session.run(feeds);
       const outputName = "final_landmarks";
       const output = results[outputName];
@@ -245,7 +276,7 @@ class FaceModel {
         float32Data[2 * targetSize * targetSize + y * targetSize + x] = b;
       }
     }
-    return new ort__namespace.Tensor("float32", float32Data, [1, 3, 192, 192]);
+    return new ort.Tensor("float32", float32Data, [1, 3, 192, 192]);
   }
 }
 var NotificationType = /* @__PURE__ */ ((NotificationType2) => {
@@ -736,6 +767,14 @@ class MetricStore {
     const stmt = this.db.prepare("SELECT * FROM break_history WHERE scheduled_time > ? ORDER BY scheduled_time DESC");
     return stmt.all(since);
   }
+  /** Break rows in [now - windowMs, now], ascending by scheduled time (for dashboard timeline overlay). */
+  getBreakHistoryInWindow(timeWindowMs) {
+    const since = Date.now() - timeWindowMs;
+    const stmt = this.db.prepare(
+      "SELECT * FROM break_history WHERE scheduled_time >= ? ORDER BY scheduled_time ASC"
+    );
+    return stmt.all(since);
+  }
   getBreakStats(days = 7) {
     const history = this.getBreakHistory(days);
     if (history.length === 0) {
@@ -901,9 +940,10 @@ class NotificationManager {
     }
   }
 }
-class MLEngine {
+class MLEngine extends require$$0$1.EventEmitter {
   // 1 minute
   constructor() {
+    super();
     __publicField(this, "poseModel");
     __publicField(this, "faceModel");
     __publicField(this, "lastState", {
@@ -943,6 +983,8 @@ class MLEngine {
     __publicField(this, "calibrationStartTime", 0);
     __publicField(this, "CALIBRATION_DURATION_MS", 6e4);
     // 60 seconds
+    __publicField(this, "MIN_CALIBRATION_SAMPLES", 30);
+    __publicField(this, "calibrationTickTimer", null);
     // Zone tracking
     __publicField(this, "zoneDistribution", /* @__PURE__ */ new Map());
     __publicField(this, "lastZoneFlushTime", Date.now());
@@ -1245,7 +1287,25 @@ class MLEngine {
     this.eyeStrainScoreBuffer = [];
     this.blinkCountInInterval = 0;
   }
+  clearCalibrationTimer() {
+    if (this.calibrationTickTimer) {
+      clearInterval(this.calibrationTickTimer);
+      this.calibrationTickTimer = null;
+    }
+  }
+  /** Stops calibration without saving (user cancelled or new session started). */
+  cancelCalibration() {
+    this.clearCalibrationTimer();
+    this.isCalibrating = false;
+    this.calibrationData = {
+      shoulderAngles: [],
+      neckAngles: [],
+      headTilts: [],
+      distances: []
+    };
+  }
   startCalibration() {
+    this.cancelCalibration();
     console.log("Starting posture calibration...");
     this.isCalibrating = true;
     this.calibrationStartTime = Date.now();
@@ -1255,14 +1315,19 @@ class MLEngine {
       headTilts: [],
       distances: []
     };
+    this.calibrationTickTimer = setInterval(() => {
+      if (!this.isCalibrating) return;
+      const elapsed = Date.now() - this.calibrationStartTime;
+      this.emit("calibration-progress", Math.min(100, elapsed / this.CALIBRATION_DURATION_MS * 100));
+      if (elapsed >= this.CALIBRATION_DURATION_MS) {
+        this.completeCalibration();
+      }
+    }, 250);
   }
   processCalibrationData(keypoints) {
     if (!this.isCalibrating) return;
     const elapsed = Date.now() - this.calibrationStartTime;
-    if (elapsed >= this.CALIBRATION_DURATION_MS) {
-      this.completeCalibration();
-      return;
-    }
+    if (elapsed >= this.CALIBRATION_DURATION_MS) return;
     const { neckAngle } = calculatePostureMetrics(keypoints);
     const leftShoulder = keypoints[5];
     const rightShoulder = keypoints[6];
@@ -1290,8 +1355,19 @@ class MLEngine {
     }
   }
   completeCalibration() {
-    console.log("Completing calibration...");
+    if (!this.isCalibrating) return;
+    this.clearCalibrationTimer();
     this.isCalibrating = false;
+    const sampleCount = this.calibrationData.neckAngles.length;
+    if (sampleCount < this.MIN_CALIBRATION_SAMPLES) {
+      console.warn("Calibration failed: insufficient samples", sampleCount);
+      this.emit(
+        "calibration-failed",
+        "Not enough pose samples. Stay visible in frame and face the camera for the full 60 seconds."
+      );
+      return;
+    }
+    console.log("Completing calibration...");
     const avgShoulder = this.calibrationData.shoulderAngles.length > 0 ? this.calibrationData.shoulderAngles.reduce((a, b) => a + b, 0) / this.calibrationData.shoulderAngles.length : 0;
     const avgNeck = this.calibrationData.neckAngles.length > 0 ? this.calibrationData.neckAngles.reduce((a, b) => a + b, 0) / this.calibrationData.neckAngles.length : 0;
     const avgHeadTilt = this.calibrationData.headTilts.length > 0 ? this.calibrationData.headTilts.reduce((a, b) => a + b, 0) / this.calibrationData.headTilts.length : 0;
@@ -1306,6 +1382,7 @@ class MLEngine {
     };
     this.db.setPostureBaseline(baseline);
     console.log("Calibration complete:", baseline);
+    this.emit("calibration-complete", baseline);
   }
 }
 const SENTRY_DSN = "https://ba4cb4d66328858c1a83a30cfada7d14@o4510356148191232.ingest.us.sentry.io/4510423908417536";
@@ -3972,7 +4049,7 @@ function requireNode$1() {
   hasRequiredNode$1 = 1;
   (function(module2, exports$1) {
     const tty2 = require$$1$3;
-    const util2 = require$$0$1;
+    const util2 = require$$0$2;
     exports$1.init = init2;
     exports$1.log = log2;
     exports$1.formatArgs = formatArgs;
@@ -6514,7 +6591,7 @@ class InstrumentationBase extends InstrumentationAbstract {
       if (isWrapped(moduleExports[name])) {
         this._unwrap(moduleExports, name);
       }
-      if (!require$$0$1.types.isProxy(moduleExports)) {
+      if (!require$$0$2.types.isProxy(moduleExports)) {
         return wrap(moduleExports, name, wrapper);
       } else {
         const wrapped = wrap(Object.assign({}, moduleExports), name, wrapper);
@@ -6525,7 +6602,7 @@ class InstrumentationBase extends InstrumentationAbstract {
       }
     });
     __publicField(this, "_unwrap", (moduleExports, name) => {
-      if (!require$$0$1.types.isProxy(moduleExports)) {
+      if (!require$$0$2.types.isProxy(moduleExports)) {
         return unwrap(moduleExports, name);
       } else {
         return Object.defineProperty(moduleExports, name, {
@@ -13282,7 +13359,7 @@ function getNumberFromEnv(key) {
   }
   const value = Number(raw);
   if (isNaN(value)) {
-    diag.warn(`Unknown value ${require$$0$1.inspect(raw)} for ${key}, expected a number, using defaults`);
+    diag.warn(`Unknown value ${require$$0$2.inspect(raw)} for ${key}, expected a number, using defaults`);
     return void 0;
   }
   return value;
@@ -13305,7 +13382,7 @@ function getBooleanFromEnv(key) {
   } else if (raw === "false") {
     return false;
   } else {
-    diag.warn(`Unknown value ${require$$0$1.inspect(raw)} for ${key}, expected 'true' or 'false', falling back to 'false' (default)`);
+    diag.warn(`Unknown value ${require$$0$2.inspect(raw)} for ${key}, expected 'true' or 'false', falling back to 'false' (default)`);
     return false;
   }
 }
@@ -16284,8 +16361,8 @@ function getAbsoluteUrl$1(origin, path2 = "/") {
     return `${url2}${path2}`;
   }
 }
-const readFileAsync = util$5.promisify(require$$0$2.readFile);
-const readDirAsync = util$5.promisify(require$$0$2.readdir);
+const readFileAsync = util$5.promisify(require$$0$3.readFile);
+const readDirAsync = util$5.promisify(require$$0$3.readdir);
 const INTEGRATION_NAME$6 = "Context";
 const _nodeContextIntegration = (options = {}) => {
   let cachedContext;
@@ -16639,7 +16716,7 @@ function makeLineReaderRanges(lines, linecontext) {
 }
 function getContextLinesFromFile(path2, ranges, output) {
   return new Promise((resolve2, _reject) => {
-    const stream2 = require$$0$2.createReadStream(path2);
+    const stream2 = require$$0$3.createReadStream(path2);
     const lineReaded = node_readline.createInterface({
       input: stream2
     });
@@ -17419,7 +17496,7 @@ var AsyncHooksContextManager$1 = {};
 var AbstractAsyncHooksContextManager$1 = {};
 Object.defineProperty(AbstractAsyncHooksContextManager$1, "__esModule", { value: true });
 AbstractAsyncHooksContextManager$1.AbstractAsyncHooksContextManager = void 0;
-const events_1$2 = require$$0$3;
+const events_1$2 = require$$0$1;
 const ADD_LISTENER_METHODS = [
   "addListener",
   "on",
@@ -22734,7 +22811,7 @@ function requireObject() {
   if (hasRequiredObject) return object.exports;
   hasRequiredObject = 1;
   (function(module2) {
-    const util2 = require$$0$1;
+    const util2 = require$$0$2;
     module2.exports = {
       serialize,
       maxDepth({ data, transport, depth = (transport == null ? void 0 : transport.depth) ?? 6 }) {
@@ -22993,7 +23070,7 @@ var hasRequiredFile$1;
 function requireFile$1() {
   if (hasRequiredFile$1) return File_1;
   hasRequiredFile$1 = 1;
-  const EventEmitter = require$$0$3;
+  const EventEmitter = require$$0$1;
   const fs2 = require$$1$5;
   const os2 = require$$1$4;
   class File extends EventEmitter {
@@ -23152,7 +23229,7 @@ var hasRequiredFileRegistry;
 function requireFileRegistry() {
   if (hasRequiredFileRegistry) return FileRegistry_1;
   hasRequiredFileRegistry = 1;
-  const EventEmitter = require$$0$3;
+  const EventEmitter = require$$0$1;
   const fs2 = require$$1$5;
   const path2 = path$r;
   const File = requireFile$1();
@@ -23995,7 +24072,7 @@ var fs$h = require$$1$5;
 var polyfills = polyfills$1;
 var legacy = legacyStreams;
 var clone = clone_1;
-var util$2 = require$$0$1;
+var util$2 = require$$0$2;
 var gracefulQueue;
 var previousSymbol;
 if (typeof Symbol === "function" && typeof Symbol.for === "function") {
@@ -24529,7 +24606,7 @@ var utimes = {
 };
 const fs$d = fs$i;
 const path$k = path$r;
-const util$1 = require$$0$1;
+const util$1 = require$$0$2;
 function getStats$2(src2, dest, opts) {
   const statFunc = opts.dereference ? (file2) => fs$d.stat(file2, { bigint: true }) : (file2) => fs$d.lstat(file2, { bigint: true });
   return Promise.all([
@@ -25821,7 +25898,7 @@ var out = {};
 var CancellationToken$1 = {};
 Object.defineProperty(CancellationToken$1, "__esModule", { value: true });
 CancellationToken$1.CancellationError = CancellationToken$1.CancellationToken = void 0;
-const events_1$1 = require$$0$3;
+const events_1$1 = require$$0$1;
 class CancellationToken extends events_1$1.EventEmitter {
   get cancelled() {
     return this._cancelled || this._parent != null && this._parent.cancelled;
@@ -35019,7 +35096,7 @@ AppUpdater$1.NoOpLogger = AppUpdater$1.AppUpdater = void 0;
 const builder_util_runtime_1$4 = out;
 const crypto_1$1 = require$$0$8;
 const os_1 = require$$1$4;
-const events_1 = require$$0$3;
+const events_1 = require$$0$1;
 const fs_extra_1$4 = lib;
 const js_yaml_1 = jsYaml;
 const lazy_val_1 = main;
@@ -36614,7 +36691,7 @@ NsisUpdater$1.NsisUpdater = NsisUpdater;
     }
   });
 })(main$1);
-class BreakManager extends require$$0$3.EventEmitter {
+class BreakManager extends require$$0$1.EventEmitter {
   constructor(store) {
     super();
     __publicField(this, "store");
@@ -36837,6 +36914,57 @@ let tray = null;
 let isQuitting = false;
 const mlEngine = new MLEngine();
 const breakManager = new BreakManager(mlEngine.getStore());
+mlEngine.on("calibration-progress", (p) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CALIBRATION_PROGRESS, p);
+  }
+});
+mlEngine.on("calibration-complete", (baseline) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CALIBRATION_COMPLETE, baseline);
+  }
+});
+mlEngine.on("calibration-failed", (reason) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CALIBRATION_FAILED, reason);
+  }
+});
+const getTrustedRendererOrigins = () => {
+  const devUrl = process.env.VITE_DEV_SERVER_URL;
+  if (devUrl) {
+    try {
+      return [new URL(devUrl).origin];
+    } catch {
+      return [];
+    }
+  }
+  return ["file://"];
+};
+const isTrustedSender = (event) => {
+  var _a;
+  const senderUrl = ((_a = event.senderFrame) == null ? void 0 : _a.url) || "";
+  if (!senderUrl) return false;
+  if (electron.app.isPackaged) {
+    return senderUrl.startsWith("file://");
+  }
+  const trustedOrigins = getTrustedRendererOrigins();
+  try {
+    const origin = new URL(senderUrl).origin;
+    return trustedOrigins.includes(origin);
+  } catch {
+    return senderUrl.startsWith("file://");
+  }
+};
+const assertTrustedSender = (event) => {
+  if (isTrustedSender(event)) return;
+  throw new Error("Rejected IPC from untrusted renderer origin");
+};
+const safeHandle = (channel, handler) => {
+  electron.ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedSender(event);
+    return handler(event, ...args);
+  });
+};
 function createTray() {
   const iconPath = path$q.join(__dirname, "../renderer/src/assets/icon.png");
   const icon = electron.nativeImage.createFromPath(iconPath);
@@ -36900,10 +37028,24 @@ function createWindow() {
     win == null ? void 0 : win.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info2);
   });
   win.webContents.setWindowOpenHandler(({ url: url2 }) => {
-    if (url2.startsWith("https:")) {
-      require("electron").shell.openExternal(url2);
+    try {
+      const parsed2 = new URL(url2);
+      if (parsed2.protocol === "https:") {
+        electron.shell.openExternal(url2);
+      }
+    } catch {
     }
     return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (event, targetUrl) => {
+    const trustedOrigins = getTrustedRendererOrigins();
+    if (electron.app.isPackaged && targetUrl.startsWith("file://")) return;
+    try {
+      const targetOrigin = new URL(targetUrl).origin;
+      if (trustedOrigins.includes(targetOrigin)) return;
+    } catch {
+    }
+    event.preventDefault();
   });
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -36931,6 +37073,11 @@ electron.app.whenReady().then(() => {
   createTray();
   let isProcessingFrame = false;
   electron.ipcMain.on(IPC_CHANNELS.SEND_FRAME, async (event, frame) => {
+    try {
+      assertTrustedSender(event);
+    } catch {
+      return;
+    }
     if (isProcessingFrame) return;
     isProcessingFrame = true;
     try {
@@ -36944,31 +37091,31 @@ electron.app.whenReady().then(() => {
       isProcessingFrame = false;
     }
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_METRICS, (event, type2, timeWindowMs) => {
+  safeHandle(IPC_CHANNELS.GET_METRICS, (event, type2, timeWindowMs) => {
     return mlEngine.getStore().getMetrics(type2, timeWindowMs);
   });
-  electron.ipcMain.handle("get-zone-metrics", (event, timeWindowMs) => {
+  safeHandle("get-zone-metrics", (event, timeWindowMs) => {
     return mlEngine.getStore().getZoneMetrics(timeWindowMs);
   });
-  electron.ipcMain.handle("get-monitor-metrics", (event, timeWindowMs) => {
+  safeHandle("get-monitor-metrics", (event, timeWindowMs) => {
     return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
+  safeHandle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
     return mlEngine.getStore().getNotificationSettings();
   });
-  electron.ipcMain.handle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
+  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
     mlEngine.getStore().updateNotificationSettings(settings);
     mlEngine.getNotificationManager().updateSettings(settings);
     return { success: true };
   });
-  electron.ipcMain.handle(IPC_CHANNELS.TEST_NOTIFICATION, (event, type2) => {
+  safeHandle(IPC_CHANNELS.TEST_NOTIFICATION, (event, type2) => {
     mlEngine.getNotificationManager().testNotification(type2);
     return { success: true };
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_AUTO_START, () => {
+  safeHandle(IPC_CHANNELS.GET_AUTO_START, () => {
     return electron.app.getLoginItemSettings().openAtLogin;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.SET_AUTO_START, (event, enable2) => {
+  safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable2) => {
     electron.app.setLoginItemSettings({
       openAtLogin: enable2,
       openAsHidden: true
@@ -36976,7 +37123,7 @@ electron.app.whenReady().then(() => {
     });
     return true;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
+  safeHandle(IPC_CHANNELS.GET_SYSTEM_STATS, async () => {
     const memory = await process.getProcessMemoryInfo();
     const cpu = process.getCPUUsage();
     return {
@@ -36985,51 +37132,58 @@ electron.app.whenReady().then(() => {
       cpu: cpu.percentCPUUsage
     };
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_APP_SETTING, (event, key) => {
+  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key) => {
     return mlEngine.getStore().getAppSetting(key);
   });
-  electron.ipcMain.handle(IPC_CHANNELS.SET_APP_SETTING, (event, key, value) => {
+  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key, value) => {
     mlEngine.getStore().setAppSetting(key, value);
     return true;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.START_CALIBRATION, async () => {
+  safeHandle(IPC_CHANNELS.START_CALIBRATION, async () => {
     mlEngine.startCalibration();
     return;
   });
-  electron.ipcMain.handle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
+  safeHandle(IPC_CHANNELS.CANCEL_CALIBRATION, async () => {
+    mlEngine.cancelCalibration();
+    return true;
+  });
+  safeHandle(IPC_CHANNELS.GET_POSTURE_BASELINE, () => {
     return mlEngine.getStore().getPostureBaseline();
   });
-  electron.ipcMain.handle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
+  safeHandle(IPC_CHANNELS.SET_POSTURE_BASELINE, (event, baseline) => {
     mlEngine.getStore().setPostureBaseline(baseline);
     return;
   });
-  electron.ipcMain.handle("get-break-settings", () => {
+  safeHandle("get-break-settings", () => {
     return breakManager.getSettings();
   });
-  electron.ipcMain.handle("update-break-settings", (event, settings) => {
+  safeHandle("update-break-settings", (event, settings) => {
     breakManager.updateSettings(settings);
     return true;
   });
-  electron.ipcMain.handle("snooze-break", () => {
+  safeHandle("snooze-break", () => {
     breakManager.snoozeBreak(10);
     return true;
   });
-  electron.ipcMain.handle("skip-break", () => {
+  safeHandle("skip-break", () => {
     breakManager.skipBreak();
     return true;
   });
-  electron.ipcMain.handle("start-break", () => {
+  safeHandle("start-break", () => {
     breakManager.startBreak();
     return true;
   });
-  electron.ipcMain.handle("end-break", (event, postBreakStrain) => {
+  safeHandle("end-break", (event, postBreakStrain) => {
     breakManager.endBreak(postBreakStrain);
     return true;
   });
-  electron.ipcMain.handle("get-break-stats", (event, days) => {
+  safeHandle("get-break-stats", (event, days) => {
     return mlEngine.getStore().getBreakStats(days || 7);
   });
-  electron.ipcMain.handle("get-time-until-break", () => {
+  safeHandle("get-break-history-window", (event, timeWindowMs) => {
+    return mlEngine.getStore().getBreakHistoryInWindow(typeof timeWindowMs === "number" ? timeWindowMs : 864e5);
+  });
+  safeHandle("get-time-until-break", () => {
     return breakManager.getTimeUntilNextBreak();
   });
   breakManager.on("countdown-update", (data) => {

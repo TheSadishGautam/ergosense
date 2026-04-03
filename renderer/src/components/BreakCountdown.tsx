@@ -14,6 +14,7 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
   if (isQuietMode) {
     return (
       <div
+        className="break-countdown-widget"
         style={{
           position: 'fixed',
           bottom: '24px',
@@ -61,8 +62,11 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
     : `${seconds}s`;
 
   return (
-    <div
+    <button
+      type="button"
+      className="break-countdown-widget"
       onClick={onViewDetails}
+      aria-label={`Next break in ${timeText}. Open break settings`}
       style={{
         position: 'fixed',
         bottom: '24px',
@@ -76,12 +80,8 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
         cursor: 'pointer',
         zIndex: 1000,
         transition: 'all 0.3s ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.05)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
+        backgroundClip: 'padding-box',
+        textAlign: 'left',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -97,6 +97,6 @@ export const BreakCountdown: React.FC<BreakCountdownProps> = ({
           {timeText}
         </div>
       </div>
-    </div>
+    </button>
   );
 };

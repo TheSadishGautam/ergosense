@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { COLORS } from '../utils/theme';
 
 interface OnboardingProps {
@@ -7,6 +8,16 @@ interface OnboardingProps {
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [step, setStep] = useState(0);
+  const primaryActionRef = useRef<HTMLButtonElement | null>(null);
+
+  const skipOnboarding = useCallback(() => {
+    onComplete();
+  }, [onComplete]);
+  useEscapeKey(skipOnboarding);
+
+  useEffect(() => {
+    primaryActionRef.current?.focus();
+  }, [step]);
 
   const slides = [
     {
@@ -71,7 +82,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const currentSlide = slides[step];
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-labelledby="onboarding-title" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -123,7 +134,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             {currentSlide.icon}
           </div>
 
-          <h2 style={{
+          <h2 id="onboarding-title" style={{
             fontSize: '2rem',
             fontWeight: 800,
             marginBottom: '16px',
@@ -164,6 +175,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         <div className="flex justify-between items-center" style={{ marginTop: '40px' }}>
           <button
+            type="button"
             onClick={onComplete}
             className="btn btn-ghost"
             style={{ color: 'rgba(255, 255, 255, 0.5)' }}
@@ -187,6 +199,8 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </div>
 
           <button
+            ref={primaryActionRef}
+            type="button"
             onClick={handleNext}
             className="btn"
             style={{
@@ -200,8 +214,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
               boxShadow: `0 4px 14px 0 ${currentSlide.color}60`,
               transition: 'transform 0.2s ease'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
           >
             {step === slides.length - 1 ? "Get Started" : "Next"}
           </button>

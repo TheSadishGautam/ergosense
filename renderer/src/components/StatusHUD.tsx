@@ -11,7 +11,7 @@ interface StatusHUDProps {
 export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
   if (!state) {
     return (
-      <div className="card" style={{ 
+      <div className="card" role="status" aria-live="polite" style={{
         padding: 'var(--space-8)', 
         textAlign: 'center',
         minWidth: '400px',
@@ -25,7 +25,7 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
 
   if (state.isUserPresent === false) {
     return (
-      <div className="card" style={{ 
+      <div className="card" role="status" aria-live="polite" style={{
         padding: 'var(--space-8)', 
         textAlign: 'center',
         minWidth: '400px',
@@ -71,10 +71,10 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
   };
 
   return (
-    <div style={{ minWidth: '450px' }} className="animate-fadeIn">
+    <section style={{ minWidth: '450px' }} className="animate-fadeIn" aria-label="Live health status panel">
       {/* Alert Banner */}
       {(state.postureScore < 0.4 || (state.blinkRate && state.blinkRate < 10)) && (
-        <div className="card" style={{
+        <div className="card" role="alert" style={{
           background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%)',
           border: '1px solid var(--danger)',
           marginBottom: 'var(--space-4)',
@@ -112,7 +112,7 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
         <div className="flex justify-around" style={{ marginBottom: 'var(--space-6)' }}>
           {/* Posture Circle */}
           <div style={{ textAlign: 'center' }}>
-            <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
+            <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }} role="img" aria-label={`Posture ${Math.round(posturePercentage)} percent`}>
               <circle
                 cx="60"
                 cy="60"
@@ -171,7 +171,7 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
 
           {/* Eye Health Circle */}
           <div style={{ textAlign: 'center' }}>
-            <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
+            <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }} role="img" aria-label={`Eye health ${Math.round(eyePercentage)} percent`}>
               <circle
                 cx="60"
                 cy="60"
@@ -362,6 +362,6 @@ export const StatusHUD: React.FC<StatusHUDProps> = ({ state }) => {
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 };

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { Clock, Footprints, Droplets, Eye, Activity, Coffee } from 'lucide-react';
 
 interface BreakPromptProps {
@@ -25,9 +26,19 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
   const [suggestion] = useState(() => 
     breakSuggestions[Math.floor(Math.random() * breakSuggestions.length)]
   );
+  const primaryActionRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    primaryActionRef.current?.focus();
+  }, []);
+
+  const skipBreakPrompt = useCallback(() => {
+    onSkip();
+  }, [onSkip]);
+  useEscapeKey(skipBreakPrompt);
 
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-labelledby="break-prompt-title" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -67,7 +78,7 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}>
             <Clock size={48} />
           </div>
-          <h2 style={{ 
+          <h2 id="break-prompt-title" style={{
             fontSize: '1.75rem', 
             fontWeight: 800, 
             margin: 0,
@@ -108,7 +119,10 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
         {/* Action Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <button
+            ref={primaryActionRef}
+            type="button"
             onClick={onTakeBreak}
+            className="break-primary-button"
             style={{
               padding: 'var(--space-4)',
               background: 'linear-gradient(135deg, #ea580b 0%, #dc2626 100%)',
@@ -121,21 +135,15 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
               boxShadow: '0 4px 16px rgba(234, 88, 11, 0.4)',
               transition: 'all 0.2s ease',
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.02)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(234, 88, 11, 0.6)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 16px rgba(234, 88, 11, 0.4)';
-            }}
           >
             Take Break ({duration} min)
           </button>
 
           <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
             <button
+              type="button"
               onClick={onSnooze}
+              className="break-secondary-button"
               style={{
                 flex: 1,
                 padding: 'var(--space-3)',
@@ -148,20 +156,14 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-              }}
             >
               Snooze 10 min
             </button>
 
             <button
+              type="button"
               onClick={onSkip}
+              className="break-skip-button"
               style={{
                 flex: 1,
                 padding: 'var(--space-3)',
@@ -173,14 +175,6 @@ export const BreakPrompt: React.FC<BreakPromptProps> = ({
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--text-secondary)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--text-tertiary)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
               }}
             >
               Skip

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from './ipc';
-import { FrameMessage, LiveState } from '../models/types';
+import { FrameMessage, LiveState, PostureBaseline } from '../models/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   sendFrame: (frame: FrameMessage) => ipcRenderer.send(IPC_CHANNELS.SEND_FRAME, frame),
@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
   startCalibration: () => ipcRenderer.invoke(IPC_CHANNELS.START_CALIBRATION),
+  cancelCalibration: () => ipcRenderer.invoke(IPC_CHANNELS.CANCEL_CALIBRATION),
   getPostureBaseline: () => ipcRenderer.invoke(IPC_CHANNELS.GET_POSTURE_BASELINE),
   setPostureBaseline: (baseline: any) => ipcRenderer.invoke(IPC_CHANNELS.SET_POSTURE_BASELINE, baseline),
   getSystemStats: () => ipcRenderer.invoke(IPC_CHANNELS.GET_SYSTEM_STATS),
@@ -39,6 +40,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_PROGRESS, subscription);
     };
   },
+  onCalibrationComplete: (callback: (baseline: PostureBaseline) => void) => {
+    const subscription = (_event: any, value: PostureBaseline) => callback(value);
+    ipcRenderer.on(IPC_CHANNELS.CALIBRATION_COMPLETE, subscription);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_COMPLETE, subscription);
+    };
+  },
+  onCalibrationFailed: (callback: (reason: string) => void) => {
+    const subscription = (_event: any, value: string) => callback(value);
+    ipcRenderer.on(IPC_CHANNELS.CALIBRATION_FAILED, subscription);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_FAILED, subscription);
+    };
+  },
   // Break Management
   getBreakSettings: () => ipcRenderer.invoke('get-break-settings'),
   updateBreakSettings: (settings: any) => ipcRenderer.invoke('update-break-settings', settings),
@@ -47,6 +62,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startBreak: () => ipcRenderer.invoke('start-break'),
   endBreak: (postBreakStrain: number) => ipcRenderer.invoke('end-break', postBreakStrain),
   getBreakStats: (days: number) => ipcRenderer.invoke('get-break-stats', days),
+  getBreakHistoryWindow: (timeWindowMs: number) => ipcRenderer.invoke('get-break-history-window', timeWindowMs),
   getTimeUntilBreak: () => ipcRenderer.invoke('get-time-until-break'),
   onBreakCountdownUpdate: (callback: (data: any) => void) => {
     const subscription = (_event: any, value: any) => callback(value);

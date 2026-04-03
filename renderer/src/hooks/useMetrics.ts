@@ -3,9 +3,9 @@
  * Custom hook for fetching and managing metrics data
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MetricRecord } from '../../../models/types';
-import { calculateAverage, calculateTrend, getMinMax } from '../utils/chartHelpers';
+import { calculateAverage, calculateTrend } from '../utils/chartHelpers';
 
 export type TimeRange = '30M' | '1H' | '6H' | '24H' | '7D' | '30D';
 
@@ -47,7 +47,7 @@ export const useMetrics = (timeRange: TimeRange, refreshInterval = 60000) => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchMetrics = async (isInitialLoad = false) => {
+  const fetchMetrics = useCallback(async (isInitialLoad = false) => {
     try {
       // Only show loading spinner on initial load, not on refresh
       if (isInitialLoad) {
@@ -74,7 +74,7 @@ export const useMetrics = (timeRange: TimeRange, refreshInterval = 60000) => {
         setLoading(false);
       }
     }
-  };
+  }, [timeRange]);
 
   useEffect(() => {
     fetchMetrics(true); // Initial load
@@ -82,7 +82,7 @@ export const useMetrics = (timeRange: TimeRange, refreshInterval = 60000) => {
     const interval = setInterval(() => fetchMetrics(false), refreshInterval); // Subsequent refreshes
     
     return () => clearInterval(interval);
-  }, [timeRange, refreshInterval]);
+  }, [fetchMetrics, refreshInterval]);
 
   // Calculate derived metrics
   const derived: DerivedMetrics = {

@@ -1,6 +1,13 @@
 /// <reference types="vite/client" />
 
-import { FrameMessage, LiveState, MetricRecord, NotificationSettings, NotificationType } from '../../models/types';
+import {
+  FrameMessage,
+  LiveState,
+  MetricRecord,
+  NotificationSettings,
+  NotificationType,
+  PostureBaseline,
+} from '../../models/types';
 
 interface ElectronAPI {
   sendFrame: (frame: FrameMessage) => void;
@@ -17,9 +24,12 @@ interface ElectronAPI {
   setAppSetting: (key: string, value: any) => Promise<boolean>;
   onUpdateAvailable: (callback: (info: any) => void) => () => void;
   startCalibration: () => Promise<void>;
+  cancelCalibration: () => Promise<boolean>;
   getPostureBaseline: () => Promise<any>;
   setPostureBaseline: (baseline: any) => Promise<void>;
   onCalibrationProgress: (callback: (progress: number) => void) => () => void;
+  onCalibrationComplete: (callback: (baseline: PostureBaseline) => void) => () => void;
+  onCalibrationFailed: (callback: (reason: string) => void) => () => void;
   getSystemStats: () => Promise<{ memory: number; cpu: number }>;
   // Break Management
   getBreakSettings: () => Promise<any>;
@@ -29,6 +39,14 @@ interface ElectronAPI {
   startBreak: () => Promise<boolean>;
   endBreak: (postBreakStrain: number) => Promise<boolean>;
   getBreakStats: (days: number) => Promise<any>;
+  getBreakHistoryWindow: (timeWindowMs: number) => Promise<
+    Array<{
+      scheduled_time: number;
+      actual_time: number | null;
+      was_taken: number;
+      was_snoozed: number;
+    }>
+  >;
   getTimeUntilBreak: () => Promise<number>;
   onBreakCountdownUpdate: (callback: (data: any) => void) => () => void;
   onBreakDue: (callback: (data: any) => void) => () => void;

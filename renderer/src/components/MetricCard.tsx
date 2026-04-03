@@ -55,25 +55,21 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     return trend > 0 ? 'var(--success-light)' : 'var(--danger-light)';
   };
 
+  const accent = getStatusColor();
+
   return (
-    <div 
-      className="card animate-fadeIn" 
-      style={{
-        position: 'relative',
-        background: getStatusGradient(),
-        border: `1px solid ${getStatusColor()}30`,
-        overflow: 'hidden',
-        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-        cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-        e.currentTarget.style.boxShadow = `0 12px 24px ${getStatusColor()}40`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0) scale(1)';
-        e.currentTarget.style.boxShadow = '';
-      }}
+    <div
+      className="card animate-fadeIn metric-card-interactive"
+      style={
+        {
+          '--metric-accent': accent,
+          position: 'relative',
+          background: getStatusGradient(),
+          border: `1px solid ${accent}30`,
+          overflow: 'hidden',
+          cursor: 'pointer',
+        } as React.CSSProperties
+      }
     >
       {/* Gradient Glow Effect */}
       <div style={{
@@ -82,7 +78,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         left: 0,
         right: 0,
         height: '3px',
-        background: `linear-gradient(90deg, ${getStatusColor()} 0%, transparent 100%)`,
+        background: `linear-gradient(90deg, ${accent} 0%, transparent 100%)`,
       }} />
 
       {/* Icon Background Blur */}
@@ -141,7 +137,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
               fontWeight: 800, 
               color: 'var(--text-primary)',
               lineHeight: 1,
-              background: `linear-gradient(135deg, ${getStatusColor()} 0%, ${getStatusColor()}80 100%)`,
+              background: `linear-gradient(135deg, ${accent} 0%, ${accent}80 100%)`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -205,7 +201,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             background: status === 'warning' 
               ? 'rgba(245, 158, 11, 0.15)' 
               : 'rgba(239, 68, 68, 0.15)',
-            border: `1px solid ${getStatusColor()}40`,
+            border: `1px solid ${accent}40`,
             fontSize: '0.7rem',
             color: status === 'warning' ? 'var(--warning-light)' : 'var(--danger-light)',
             fontWeight: 600,

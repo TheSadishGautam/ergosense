@@ -14,7 +14,10 @@ const IPC_CHANNELS = {
   SET_APP_SETTING: "set-app-setting",
   UPDATE_AVAILABLE: "update-available",
   START_CALIBRATION: "start-calibration",
+  CANCEL_CALIBRATION: "cancel-calibration",
   CALIBRATION_PROGRESS: "calibration-progress",
+  CALIBRATION_COMPLETE: "calibration-complete",
+  CALIBRATION_FAILED: "calibration-failed",
   GET_POSTURE_BASELINE: "get-posture-baseline",
   SET_POSTURE_BASELINE: "set-posture-baseline"
 };
@@ -45,6 +48,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
     };
   },
   startCalibration: () => electron.ipcRenderer.invoke(IPC_CHANNELS.START_CALIBRATION),
+  cancelCalibration: () => electron.ipcRenderer.invoke(IPC_CHANNELS.CANCEL_CALIBRATION),
   getPostureBaseline: () => electron.ipcRenderer.invoke(IPC_CHANNELS.GET_POSTURE_BASELINE),
   setPostureBaseline: (baseline) => electron.ipcRenderer.invoke(IPC_CHANNELS.SET_POSTURE_BASELINE, baseline),
   getSystemStats: () => electron.ipcRenderer.invoke(IPC_CHANNELS.GET_SYSTEM_STATS),
@@ -55,6 +59,20 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
       electron.ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_PROGRESS, subscription);
     };
   },
+  onCalibrationComplete: (callback) => {
+    const subscription = (_event, value) => callback(value);
+    electron.ipcRenderer.on(IPC_CHANNELS.CALIBRATION_COMPLETE, subscription);
+    return () => {
+      electron.ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_COMPLETE, subscription);
+    };
+  },
+  onCalibrationFailed: (callback) => {
+    const subscription = (_event, value) => callback(value);
+    electron.ipcRenderer.on(IPC_CHANNELS.CALIBRATION_FAILED, subscription);
+    return () => {
+      electron.ipcRenderer.removeListener(IPC_CHANNELS.CALIBRATION_FAILED, subscription);
+    };
+  },
   // Break Management
   getBreakSettings: () => electron.ipcRenderer.invoke("get-break-settings"),
   updateBreakSettings: (settings) => electron.ipcRenderer.invoke("update-break-settings", settings),
@@ -63,6 +81,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   startBreak: () => electron.ipcRenderer.invoke("start-break"),
   endBreak: (postBreakStrain) => electron.ipcRenderer.invoke("end-break", postBreakStrain),
   getBreakStats: (days) => electron.ipcRenderer.invoke("get-break-stats", days),
+  getBreakHistoryWindow: (timeWindowMs) => electron.ipcRenderer.invoke("get-break-history-window", timeWindowMs),
   getTimeUntilBreak: () => electron.ipcRenderer.invoke("get-time-until-break"),
   onBreakCountdownUpdate: (callback) => {
     const subscription = (_event, value) => callback(value);
