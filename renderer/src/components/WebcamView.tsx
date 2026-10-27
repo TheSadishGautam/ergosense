@@ -1,9 +1,30 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FrameMessage } from '../../../models/types';
 
 const FRAME_INTERVAL_MS = 150;
 const WIDTH = 224;
 const HEIGHT = 224;
+
+const isWindows = navigator.userAgent.includes('Windows');
+
+const describeCameraError = (err: unknown): string => {
+  const name = err instanceof DOMException || err instanceof Error ? err.name : '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return isWindows
+        ? 'Camera access is blocked. Open Windows Settings → Privacy & security → Camera and turn on "Let desktop apps access your camera".'
+        : 'Camera access is blocked. Allow ErgoSense to use the camera in your system privacy settings.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'The camera is in use by another app (e.g. Teams, Zoom, or another ErgoSense window). Close it and try again.';
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'No camera was found. Connect a webcam and try again.';
+    default:
+      return 'The camera could not be started. Check that it is connected and not in use, then try again.';
+  }
+};
 
 export interface WebcamViewProps {
   /** When true, releases the camera and stops sending frames (e.g. during calibration modal). */
@@ -14,6 +35,8 @@ export const WebcamView = React.memo(({ suspendWhen = false }: WebcamViewProps) 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastSentAtRef = useRef(0);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const captureAndSendFrame = useCallback(() => {
     if (suspendWhen) return;
@@ -55,10 +78,17 @@ export const WebcamView = React.memo(({ suspendWhen = false }: WebcamViewProps) 
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let activeStream: MediaStream | null = null;
 
+    let cancelled = false;
+
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         activeStream = stream;
+        setCameraError(null);
         const v = videoRef.current;
         if (v) {
           v.srcObject = stream;
@@ -67,12 +97,14 @@ export const WebcamView = React.memo(({ suspendWhen = false }: WebcamViewProps) 
         intervalId = setInterval(captureAndSendFrame, FRAME_INTERVAL_MS);
       } catch (err) {
         console.error('Error accessing webcam:', err);
+        if (!cancelled) setCameraError(describeCameraError(err));
       }
     };
 
     startCamera();
 
     return () => {
+      cancelled = true;
       if (intervalId) {
         clearInterval(intervalId);
       }
@@ -80,7 +112,7 @@ export const WebcamView = React.memo(({ suspendWhen = false }: WebcamViewProps) 
         activeStream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [suspendWhen, captureAndSendFrame]);
+  }, [suspendWhen, captureAndSendFrame, retryCount]);
 
   if (suspendWhen) {
     return (
@@ -130,6 +162,32 @@ export const WebcamView = React.memo(({ suspendWhen = false }: WebcamViewProps) 
         }}
       />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      {cameraError && (
+        <div
+          role="alert"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'var(--space-4)',
+            padding: 'var(--space-6)',
+            background: 'var(--bg-secondary)',
+            color: 'var(--text-secondary)',
+            fontSize: '0.875rem',
+            textAlign: 'center',
+            zIndex: 1,
+          }}
+        >
+          {cameraError}
+          <button type="button" className="btn btn-primary" onClick={() => setRetryCount((n) => n + 1)}>
+            Try again
+          </button>
+        </div>
+      )}
 
       <div
         style={{

@@ -1,7 +1,6 @@
 import { Notification } from 'electron';
 import { NotificationSettings, NotificationType } from '../../models/types';
-import path from 'path';
-import { app } from 'electron';
+import { getAppIconPath } from '../appIcon';
 
 interface NotificationCooldown {
   [key: string]: number; // timestamp of last notification
@@ -16,18 +15,8 @@ export class NotificationManager {
 
   constructor(settings: NotificationSettings) {
     this.settings = settings;
-    // Get icon path from app resources
-    // In dev, VITE_PUBLIC is set. In prod, we need to resolve relative to the app bundle.
-    if (app.isPackaged) {
-      this.iconPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'renderer', 'src', 'assets', 'icon.png');
-      // Fallback if unpacked doesn't exist (e.g. if not using asar.unpacked)
-      if (!require('fs').existsSync(this.iconPath)) {
-         this.iconPath = path.join(__dirname, '../../renderer/src/assets/icon.png');
-      }
-    } else {
-      this.iconPath = path.join(__dirname, '../../renderer/src/assets/icon.png');
-    }
-    
+    this.iconPath = getAppIconPath();
+
     // Initialize cooldowns to prevent immediate alerts on startup
     // Give a 10-second grace period for all notification types
     const now = Date.now();
@@ -133,40 +122,20 @@ export class NotificationManager {
 
   testNotification(type: NotificationType) {
     // Send test notification without cooldown check
-    switch (type) {
-      case NotificationType.POSTURE:
-        new Notification({
-          title: '⚠️ Test: Poor Posture',
-          body: 'This is a test posture alert (35%)',
-          silent: !this.settings.sound,
-          icon: this.iconPath,
-        }).show();
-        break;
-      case NotificationType.EYE_STRAIN:
-        new Notification({
-          title: '👁️ Test: High Eye Strain',
-          body: 'This is a test eye strain alert (75%)',
-          silent: !this.settings.sound,
-          icon: this.iconPath,
-        }).show();
-        break;
-      case NotificationType.BLINK_RATE:
-        new Notification({
-          title: '✨ Test: Low Blink Rate',
-          body: 'This is a test blink rate alert (8/min)',
-          silent: !this.settings.sound,
-          icon: this.iconPath,
-        }).show();
-        break;
-      case NotificationType.BREAK_REMINDER:
-        new Notification({
-          title: '⏰ Test: Break Time',
-          body: 'This is a test break reminder',
-           silent: !this.settings.sound,
-          icon: this.iconPath,
-        }).show();
-        break;
-    }
+    const tests: Record<NotificationType, { title: string; body: string }> = {
+      [NotificationType.POSTURE]: { title: '⚠️ Test: Poor Posture', body: 'This is a test posture alert (35%)' },
+      [NotificationType.EYE_STRAIN]: { title: '👁️ Test: High Eye Strain', body: 'This is a test eye strain alert (75%)' },
+      [NotificationType.BLINK_RATE]: { title: '✨ Test: Low Blink Rate', body: 'This is a test blink rate alert (8/min)' },
+      [NotificationType.BREAK_REMINDER]: { title: '⏰ Test: Break Time', body: 'This is a test break reminder' },
+    };
+    const test = tests[type];
+    if (!test) return;
+
+    new Notification({
+      ...test,
+      silent: !this.settings.sound,
+      icon: this.iconPath,
+    }).show();
   }
 
   cleanup() {

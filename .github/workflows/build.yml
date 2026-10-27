@@ -35,8 +35,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Rebuild native modules
-        run: npx electron-rebuild
+      - name: Bundle VC++ Redistributable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile build/vc_redist.x64.exe
 
       - name: Typecheck (web + electron)
         run: npm run typecheck

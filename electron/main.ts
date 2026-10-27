@@ -7,6 +7,23 @@ import { SENTRY_DSN } from '../models/constants';
 import * as Sentry from '@sentry/electron/main';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
+import { getAppIconPath } from './appIcon';
+
+const APP_ID = 'com.sadishgautam.ergosense';
+const HIDDEN_LAUNCH_ARG = '--hidden';
+
+// Must run before anything reads app.getPath('userData') (MetricStore below).
+app.setName('ErgoSense');
+
+if (process.platform === 'win32') {
+  // Windows drops toast notifications unless this matches the installer shortcut's AppUserModelID.
+  app.setAppUserModelId(APP_ID);
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
 
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
@@ -88,19 +105,29 @@ const safeHandle = (
   });
 };
 
+function showWindow() {
+  if (!win || win.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
 function createTray() {
-  const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png');
-  const icon = nativeImage.createFromPath(iconPath);
-  
+  const icon = nativeImage.createFromPath(getAppIconPath());
+  if (icon.isEmpty()) {
+    log.warn('Tray icon not found at', getAppIconPath());
+  }
+
   tray = new Tray(icon.resize({ width: 16, height: 16 }));
   tray.setToolTip('ErgoSense');
   
   const contextMenu = Menu.buildFromTemplate([
     { 
-      label: 'Show App', 
-      click: () => {
-        win?.show();
-      } 
+      label: 'Show App',
+      click: showWindow,
     },
     { type: 'separator' },
     { 
@@ -114,16 +141,14 @@ function createTray() {
   
   tray.setContextMenu(contextMenu);
   
-  tray.on('double-click', () => {
-    win?.show();
-  });
+  // Windows users expect a single click on the tray icon to restore the app.
+  tray.on('click', showWindow);
+  tray.on('double-click', showWindow);
 }
 
-app.setName('ErgoSense');
+function createWindow({ startHidden = false } = {}) {
+  const iconPath = getAppIconPath();
 
-function createWindow() {
-  const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png');
-  
   if (process.platform === 'darwin') {
     app.dock.setIcon(nativeImage.createFromPath(iconPath));
   }
@@ -133,6 +158,7 @@ function createWindow() {
     height: 800,
     title: 'ErgoSense',
     icon: iconPath,
+    show: !startHidden,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -151,16 +177,6 @@ function createWindow() {
 
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString());
-  });
-
-  autoUpdater.checkForUpdates();
-
-  autoUpdater.on('update-available', (info) => {
-    win?.webContents.send(IPC_CHANNELS.UPDATE_AVAILABLE, info);
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    win?.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info);
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -208,13 +224,39 @@ app.on('activate', () => {
   }
 });
 
+// A second launch (e.g. clicking the Start menu shortcut while hidden in the tray) focuses this instance.
+app.on('second-instance', showWindow);
+
 app.on('before-quit', () => {
   isQuitting = true;
 });
 
+const sendToWindow = (channel: string, data: unknown) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel, data);
+  }
+};
+
+function setupAutoUpdater() {
+  // Portable builds and dev runs have no update feed.
+  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR) return;
+
+  autoUpdater.on('update-available', (info) => sendToWindow(IPC_CHANNELS.UPDATE_AVAILABLE, info));
+  autoUpdater.on('update-downloaded', (info) => sendToWindow(IPC_CHANNELS.UPDATE_DOWNLOADED, info));
+  autoUpdater.on('error', (err) => log.warn('Auto-update error:', err));
+  autoUpdater.checkForUpdates().catch((err) => log.warn('Update check failed:', err));
+}
+
+const clampTimeWindow = (value: unknown, fallback = 86_400_000): number => {
+  const MAX_WINDOW_MS = 366 * 86_400_000;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return fallback;
+  return Math.min(value, MAX_WINDOW_MS);
+};
+
 app.whenReady().then(() => {
-  createWindow();
+  createWindow({ startHidden: process.argv.includes(HIDDEN_LAUNCH_ARG) });
   createTray();
+  setupAutoUpdater();
 
   let isProcessingFrame = false;
 
@@ -242,15 +284,15 @@ app.whenReady().then(() => {
   });
 
   safeHandle(IPC_CHANNELS.GET_METRICS, (event, type: string, timeWindowMs: number) => {
-    return mlEngine.getStore().getMetrics(type, timeWindowMs);
+    return mlEngine.getStore().getMetrics(String(type), clampTimeWindow(timeWindowMs));
   });
 
   safeHandle('get-zone-metrics', (event, timeWindowMs: number) => {
-    return mlEngine.getStore().getZoneMetrics(timeWindowMs);
+    return mlEngine.getStore().getZoneMetrics(clampTimeWindow(timeWindowMs));
   });
 
   safeHandle('get-monitor-metrics', (event, timeWindowMs: number) => {
-    return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
+    return mlEngine.getStore().getMonitorMetrics(clampTimeWindow(timeWindowMs));
   });
 
   safeHandle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
@@ -274,8 +316,10 @@ app.whenReady().then(() => {
 
   safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable: boolean) => {
     app.setLoginItemSettings({
-      openAtLogin: enable,
+      openAtLogin: enable === true,
+      // openAsHidden is macOS-only; Windows gets a launch arg checked in whenReady.
       openAsHidden: true,
+      args: [HIDDEN_LAUNCH_ARG],
     });
     return true;
   });
@@ -347,26 +391,18 @@ app.whenReady().then(() => {
   });
 
   safeHandle('get-break-stats', (event, days) => {
-    return mlEngine.getStore().getBreakStats(days || 7);
+    return mlEngine.getStore().getBreakStats(typeof days === 'number' && days > 0 ? Math.min(days, 366) : 7);
   });
 
   safeHandle('get-break-history-window', (event, timeWindowMs: number) => {
-    return mlEngine.getStore().getBreakHistoryInWindow(typeof timeWindowMs === 'number' ? timeWindowMs : 86_400_000);
+    return mlEngine.getStore().getBreakHistoryInWindow(clampTimeWindow(timeWindowMs));
   });
 
   safeHandle('get-time-until-break', () => {
     return breakManager.getTimeUntilNextBreak();
   });
 
-  breakManager.on('countdown-update', (data) => {
-    win?.webContents.send('break-countdown-update', data);
-  });
-
-  breakManager.on('break-due', (data) => {
-    win?.webContents.send('break-due', data);
-  });
-
-  breakManager.on('break-warning', (data) => {
-    win?.webContents.send('break-warning', data);
-  });
+  breakManager.on('countdown-update', (data) => sendToWindow('break-countdown-update', data));
+  breakManager.on('break-due', (data) => sendToWindow('break-due', data));
+  breakManager.on('break-warning', (data) => sendToWindow('break-warning', data));
 });

@@ -8,14 +8,14 @@ Thank you for your interest in contributing to ErgoSense! We welcome contributio
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js**: v18 or later (LTS recommended)
+- **Node.js**: v20 (matches `engines` in `package.json`)
 - **npm**: Included with Node.js
 - **Build Tools**:
   - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-  - **Windows**: Visual Studio Build Tools (C++ workload) or `npm install --global --production windows-build-tools`
+  - **Windows**: Visual Studio Build Tools with the "Desktop development with C++" workload, plus Python 3 (`windows-build-tools` is deprecated and does not work on Node 20)
   - **Linux**: `build-essential` and python3
 
-> **Note:** This project uses native modules (`better-sqlite3`, `brightness`), so a proper C++ build environment is required.
+> **Note:** This project uses native modules (`better-sqlite3`, `onnxruntime-node`). Prebuilt binaries are used when available; the build tools above are only needed if a module has to compile from source.
 
 ### Installation
 
