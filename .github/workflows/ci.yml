@@ -51,6 +51,7 @@ jobs:
 
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      ONNXRUNTIME_NODE_INSTALL: skip
 
     steps:
       - name: Check out repository
