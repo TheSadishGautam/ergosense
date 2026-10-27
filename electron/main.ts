@@ -7,6 +7,32 @@ import { SENTRY_DSN } from '../models/constants';
 import * as Sentry from '@sentry/electron/main';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
+import { getAppIconPath } from './appIcon';
+import { runSmokeTest, SMOKE_TEST_OUTPUT } from './smokeTest';
+import {
+  clampDays,
+  clampTimeWindow,
+  clampUnit,
+  isRendererSettingKey,
+  sanitizeBreakSettings,
+  sanitizeNotificationSettings,
+} from './ipcValidation';
+
+const APP_ID = 'com.sadishgautam.ergosense';
+const HIDDEN_LAUNCH_ARG = '--hidden';
+
+// Must run before anything reads app.getPath('userData') (MetricStore below).
+app.setName('ErgoSense');
+
+if (process.platform === 'win32') {
+  // Windows drops toast notifications unless this matches the installer shortcut's AppUserModelID.
+  app.setAppUserModelId(APP_ID);
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
 
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
@@ -60,7 +86,8 @@ const isTrustedSender = (event: IpcMainEvent | IpcMainInvokeEvent): boolean => {
   const senderUrl = event.senderFrame?.url || '';
   if (!senderUrl) return false;
 
-  if (app.isPackaged) {
+  // file:// URLs have an opaque origin ("null"), so match the scheme for locally loaded builds.
+  if (app.isPackaged || !process.env.VITE_DEV_SERVER_URL) {
     return senderUrl.startsWith('file://');
   }
 
@@ -88,19 +115,29 @@ const safeHandle = (
   });
 };
 
+function showWindow() {
+  if (!win || win.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
 function createTray() {
-  const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png');
-  const icon = nativeImage.createFromPath(iconPath);
-  
+  const icon = nativeImage.createFromPath(getAppIconPath());
+  if (icon.isEmpty()) {
+    log.warn('Tray icon not found at', getAppIconPath());
+  }
+
   tray = new Tray(icon.resize({ width: 16, height: 16 }));
   tray.setToolTip('ErgoSense');
   
   const contextMenu = Menu.buildFromTemplate([
     { 
-      label: 'Show App', 
-      click: () => {
-        win?.show();
-      } 
+      label: 'Show App',
+      click: showWindow,
     },
     { type: 'separator' },
     { 
@@ -114,25 +151,22 @@ function createTray() {
   
   tray.setContextMenu(contextMenu);
   
-  tray.on('double-click', () => {
-    win?.show();
-  });
+  // Windows users expect a single click on the tray icon to restore the app.
+  tray.on('click', showWindow);
+  tray.on('double-click', showWindow);
 }
 
-app.setName('ErgoSense');
+function createWindow({ startHidden = false } = {}) {
+  const iconPath = getAppIconPath();
 
-function createWindow() {
-  const iconPath = path.join(__dirname, '../renderer/src/assets/icon.png');
-  
-  if (process.platform === 'darwin') {
-    app.dock.setIcon(nativeImage.createFromPath(iconPath));
-  }
+  app.dock?.setIcon(nativeImage.createFromPath(iconPath));
 
   win = new BrowserWindow({
     width: 1200,
     height: 800,
     title: 'ErgoSense',
     icon: iconPath,
+    show: !startHidden,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -151,16 +185,6 @@ function createWindow() {
 
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString());
-  });
-
-  autoUpdater.checkForUpdates();
-
-  autoUpdater.on('update-available', (info) => {
-    win?.webContents.send(IPC_CHANNELS.UPDATE_AVAILABLE, info);
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    win?.webContents.send(IPC_CHANNELS.UPDATE_DOWNLOADED, info);
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -208,13 +232,36 @@ app.on('activate', () => {
   }
 });
 
+// A second launch (e.g. clicking the Start menu shortcut while hidden in the tray) focuses this instance.
+app.on('second-instance', showWindow);
+
 app.on('before-quit', () => {
   isQuitting = true;
 });
 
+const sendToWindow = (channel: string, data: unknown) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel, data);
+  }
+};
+
+function setupAutoUpdater() {
+  // Portable builds, dev runs and CI smoke tests have no update feed.
+  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR || SMOKE_TEST_OUTPUT) return;
+
+  autoUpdater.on('update-available', (info) => sendToWindow(IPC_CHANNELS.UPDATE_AVAILABLE, info));
+  autoUpdater.on('update-downloaded', (info) => sendToWindow(IPC_CHANNELS.UPDATE_DOWNLOADED, info));
+  autoUpdater.on('error', (err) => log.warn('Auto-update error:', err));
+  autoUpdater.checkForUpdates().catch((err) => log.warn('Update check failed:', err));
+}
+
 app.whenReady().then(() => {
-  createWindow();
+  const openedAtLogin =
+    process.argv.includes(HIDDEN_LAUNCH_ARG) ||
+    (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin);
+  createWindow({ startHidden: openedAtLogin || Boolean(SMOKE_TEST_OUTPUT) });
   createTray();
+  setupAutoUpdater();
 
   let isProcessingFrame = false;
 
@@ -242,22 +289,23 @@ app.whenReady().then(() => {
   });
 
   safeHandle(IPC_CHANNELS.GET_METRICS, (event, type: string, timeWindowMs: number) => {
-    return mlEngine.getStore().getMetrics(type, timeWindowMs);
+    return mlEngine.getStore().getMetrics(String(type), clampTimeWindow(timeWindowMs));
   });
 
   safeHandle('get-zone-metrics', (event, timeWindowMs: number) => {
-    return mlEngine.getStore().getZoneMetrics(timeWindowMs);
+    return mlEngine.getStore().getZoneMetrics(clampTimeWindow(timeWindowMs));
   });
 
   safeHandle('get-monitor-metrics', (event, timeWindowMs: number) => {
-    return mlEngine.getStore().getMonitorMetrics(timeWindowMs);
+    return mlEngine.getStore().getMonitorMetrics(clampTimeWindow(timeWindowMs));
   });
 
   safeHandle(IPC_CHANNELS.GET_NOTIFICATION_SETTINGS, () => {
     return mlEngine.getStore().getNotificationSettings();
   });
 
-  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
+  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, input) => {
+    const settings = sanitizeNotificationSettings(input, mlEngine.getStore().getNotificationSettings());
     mlEngine.getStore().updateNotificationSettings(settings);
     mlEngine.getNotificationManager().updateSettings(settings);
     return { success: true };
@@ -274,8 +322,9 @@ app.whenReady().then(() => {
 
   safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable: boolean) => {
     app.setLoginItemSettings({
-      openAtLogin: enable,
-      openAsHidden: true,
+      openAtLogin: enable === true,
+      // Windows: launch arg checked in whenReady. macOS: detected via wasOpenedAtLogin.
+      args: [HIDDEN_LAUNCH_ARG],
     });
     return true;
   });
@@ -289,11 +338,13 @@ app.whenReady().then(() => {
     };
   });
 
-  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key: string) => {
+  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key: unknown) => {
+    if (!isRendererSettingKey(key)) throw new Error(`Setting "${String(key)}" is not accessible from the renderer`);
     return mlEngine.getStore().getAppSetting(key);
   });
 
-  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key: string, value: any) => {
+  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key: unknown, value: unknown) => {
+    if (!isRendererSettingKey(key)) throw new Error(`Setting "${String(key)}" is not accessible from the renderer`);
     mlEngine.getStore().setAppSetting(key, value);
     return true;
   });
@@ -322,7 +373,7 @@ app.whenReady().then(() => {
   });
 
   safeHandle('update-break-settings', (event, settings) => {
-    breakManager.updateSettings(settings);
+    breakManager.updateSettings(sanitizeBreakSettings(settings));
     return true;
   });
 
@@ -342,31 +393,27 @@ app.whenReady().then(() => {
   });
 
   safeHandle('end-break', (event, postBreakStrain) => {
-    breakManager.endBreak(postBreakStrain);
+    breakManager.endBreak(clampUnit(postBreakStrain));
     return true;
   });
 
   safeHandle('get-break-stats', (event, days) => {
-    return mlEngine.getStore().getBreakStats(days || 7);
+    return mlEngine.getStore().getBreakStats(clampDays(days));
   });
 
   safeHandle('get-break-history-window', (event, timeWindowMs: number) => {
-    return mlEngine.getStore().getBreakHistoryInWindow(typeof timeWindowMs === 'number' ? timeWindowMs : 86_400_000);
+    return mlEngine.getStore().getBreakHistoryInWindow(clampTimeWindow(timeWindowMs));
   });
 
   safeHandle('get-time-until-break', () => {
     return breakManager.getTimeUntilNextBreak();
   });
 
-  breakManager.on('countdown-update', (data) => {
-    win?.webContents.send('break-countdown-update', data);
-  });
+  breakManager.on('countdown-update', (data) => sendToWindow('break-countdown-update', data));
+  breakManager.on('break-due', (data) => sendToWindow('break-due', data));
+  breakManager.on('break-warning', (data) => sendToWindow('break-warning', data));
 
-  breakManager.on('break-due', (data) => {
-    win?.webContents.send('break-due', data);
-  });
-
-  breakManager.on('break-warning', (data) => {
-    win?.webContents.send('break-warning', data);
-  });
+  if (SMOKE_TEST_OUTPUT && win) {
+    void runSmokeTest(win, mlEngine, SMOKE_TEST_OUTPUT);
+  }
 });

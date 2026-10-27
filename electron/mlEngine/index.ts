@@ -9,6 +9,7 @@ import { NotificationManager } from '../services/NotificationManager';
 export class MLEngine extends EventEmitter {
   private poseModel: PoseModel;
   private faceModel: FaceModel;
+  private modelsLoading: Promise<unknown>;
   private lastState: Partial<LiveState> = {
     postureState: 'OK',
     postureScore: 1,
@@ -75,14 +76,19 @@ export class MLEngine extends EventEmitter {
   constructor() {
     super();
     this.poseModel = new PoseModel();
-    this.poseModel.load();
     this.faceModel = new FaceModel();
-    this.faceModel.load();
+    this.modelsLoading = Promise.all([this.poseModel.load(), this.faceModel.load()]);
     this.db = new MetricStore();
     
     // Initialize notification manager with settings from DB
     const settings = this.db.getNotificationSettings();
     this.notificationManager = new NotificationManager(settings);
+  }
+
+  /** Resolves once both models have finished loading (successfully or not). */
+  public async modelsLoaded(): Promise<boolean> {
+    await this.modelsLoading;
+    return this.poseModel.isLoaded() && this.faceModel.isLoaded();
   }
 
   public getStore() {

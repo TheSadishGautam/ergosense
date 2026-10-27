@@ -12,7 +12,7 @@
     "build:all": "tsc && vite build && electron-builder --mac --win --linux",
     "postinstall": "electron-builder install-app-deps",
     "preview": "vite preview",
-    "lint": "eslint renderer/src electron/main.ts",
+    "lint": "eslint renderer/src electron",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck:web": "tsc -p tsconfig.json --noEmit",
@@ -20,7 +20,7 @@
     "typecheck": "npm run typecheck:web && npm run typecheck:electron"
   },
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=22.12"
   },
   "keywords": [
     "ergonomics",
@@ -40,14 +40,12 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^20.11.0",
+    "@types/node": "^24.19.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "electron-rebuild": "^3.2.9",
+    "electron": "^44.9.3",
+    "electron-builder": "^26.18.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.4.0",
@@ -61,10 +59,8 @@
   },
   "dependencies": {
     "@sentry/electron": "^7.3.0",
-    "better-sqlite3": "^12.4.6",
-    "brightness": "^3.0.0",
     "electron-log": "^5.4.3",
-    "electron-updater": "^6.6.2",
+    "electron-updater": "^6.8.11",
     "lucide-react": "^0.555.0",
     "onnxruntime-node": "^1.16.3",
     "react": "^18.2.0",

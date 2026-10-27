@@ -20,3 +20,6 @@ release
 *.sln
 *.sw?
 temp_asar_extract
+
+# Downloaded in CI and bundled into the Windows installer
+build/vc_redist.x64.exe

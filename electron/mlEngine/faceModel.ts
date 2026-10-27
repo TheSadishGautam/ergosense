@@ -1,24 +1,7 @@
-import type * as ORT from 'onnxruntime-node';
 import path from 'node:path';
-import { app, dialog } from 'electron';
+import { app } from 'electron';
+import { ort, type ORT } from './ort';
 import { FrameMessage } from '../../models/types';
-
-let ort: typeof ORT;
-
-try {
-  ort = require('onnxruntime-node');
-} catch (e) {
-  if (process.platform === 'win32') {
-    dialog.showErrorBox(
-      'Missing System Dependency',
-      'ErgoSense requires the Visual C++ Redistributable to run.\n\nPlease install "Visual C++ Redistributable for Visual Studio 2015-2022" and try again.\n\nError: ' + (e as Error).message
-    );
-    app.quit();
-    process.exit(1);
-  } else {
-    throw e;
-  }
-}
 
 const MODEL_PATH = app.isPackaged
   ? path.join(process.resourcesPath, 'resources', 'face_mesh.onnx')
@@ -28,6 +11,10 @@ export class FaceModel {
   private session: ORT.InferenceSession | null = null;
   private inputName: string = 'input';
   
+  isLoaded(): boolean {
+    return this.session !== null;
+  }
+
   async load() {
     console.log('Attempting to load face model from:', MODEL_PATH);
     try {

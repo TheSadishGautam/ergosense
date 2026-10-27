@@ -37,7 +37,7 @@ The repository is meticulously maintained to provide clean, organized, and easil
 
 ### 🔒 Privacy-First Design
 
-- **100% Local Processing**: All AI analysis happens directly on your device using TensorFlow/MediaPipe.
+- **100% Local Processing**: All AI analysis happens directly on your device using ONNX Runtime.
 - **No Cloud Uploads**: No video feeds or images are ever sent to the cloud. Your data stays yours.
 - **Offline Capable**: Works perfectly without an internet connection—true privacy by design.
 - **Lightweight Architecture**: Engineered to use less than 5% CPU, ensuring it doesn't slow down your workflow.
@@ -71,15 +71,15 @@ ErgoSense contains professionally prepared build files and installers for ErgoSe
 **Windows (Available)**
 
 - Windows 10 and later versions
-- Both 32-bit and 64-bit architectures
-- .exe installers and portable versions
+- 64-bit (x64) only
+- .exe installer and portable versions
 - Full feature parity with macOS
 
 **Linux (Available)**
 
 - Support for major Linux distributions including Ubuntu, Debian, Fedora, CentOS, and others
-- Both 64-bit (x86-64) and ARM64 architectures
-- Available in multiple formats: AppImage, Snap, DEB packages, and RPM packages
+- 64-bit (x86-64)
+- Available in multiple formats: AppImage, DEB packages, and RPM packages
 - Native support for your favorite Linux distribution
 
 ## Why This Repository?
@@ -116,7 +116,7 @@ Every build released through this repository has been tested for:
 
 ## How It Works
 
-1. **Install & Launch**: Download the lightweight app for macOS (v0.1.0 available now).
+1. **Install & Launch**: Download the lightweight app for macOS, Windows, or Linux.
 2. **Calibrate**: Sit comfortably and let ErgoSense learn your neutral spine position in seconds.
 3. **Work Normally**: The app runs in the background, analyzing video frames locally on your device using AI.
 4. **Get Notified**: Receive gentle, non-intrusive alerts when you need to adjust your posture or take a break.
@@ -124,13 +124,12 @@ Every build released through this repository has been tested for:
 
 ## Technical Specifications
 
-- **Current Platform**: macOS (v0.1.0)
-- **Upcoming Platforms**: Windows & Linux (coming soon)
+- **Platforms**: macOS, Windows (x64), Linux (x64)
 - **Architecture**: Electron + React + TypeScript
-- **AI Engine**: TensorFlow / MediaPipe (optimized for CPU/GPU)
+- **AI Engine**: ONNX Runtime (MoveNet pose + face mesh models, CPU)
 - **Database**: Local SQLite for secure metric storage
 - **Performance**: Ultra-lightweight—uses less than 5% CPU, so it won't slow down your workflow
-- **Privacy**: 100% local processing with TensorFlow/MediaPipe—no cloud uploads, no privacy concerns
+- **Privacy**: 100% local processing with ONNX Runtime—no cloud uploads, no privacy concerns
 - **Connectivity**: Works offline perfectly; internet only needed for app updates
 
 ## Getting Started
@@ -202,13 +201,11 @@ If you'd like to contribute to ErgoSense's development—including help with set
 ### For Windows Users
 
 1. Visit the [Releases](../../releases) page
-2. Download the latest ErgoSense .exe installer for your system:
-   - **64-bit Windows** (Recommended): Download the x64 version
-   - **32-bit Windows**: Download the x86 version
-3. Run the installer and follow the on-screen setup wizard
-4. Choose your installation directory and desired shortcuts
+2. Download the latest ErgoSense Setup `.exe` (installer) or the portable `.exe` (no install needed). Only 64-bit Windows is supported.
+3. If SmartScreen shows "Windows protected your PC", click **More info** → **Run anyway** (the app is not code-signed yet)
+4. Run the installer and follow the on-screen setup wizard. It installs the Microsoft Visual C++ Redistributable automatically if it is missing.
 5. Complete the installation
-6. **Important**: Grant camera and microphone permissions when prompted by Windows Security
+6. **Important**: Make sure camera access is on: Settings → Privacy & security → Camera → "Let desktop apps access your camera"
 7. Launch ErgoSense from your Start menu or desktop shortcut
 8. Follow the calibration wizard to set up your neutral spine position
 
@@ -313,8 +310,6 @@ Each release includes detailed release notes describing new features, improvemen
 
 ### Installation Troubleshooting
 
-### Installation Troubleshooting
-
 **macOS**
 
 - **"App was blocked because it is not from an identified developer"**: This is expected for the early-access version. Follow the detailed steps in the macOS installation guide above under "Step 3: Handle Security Warning". Go to System Settings → Privacy & Security and click "Allow Anyway" next to ErgoSense.
@@ -333,8 +328,6 @@ If you're interested in helping ErgoSense get properly code-signed and notarized
 
 Simply download and run the installer. If Windows SmartScreen warns you, click "More info" and then "Run anyway".
 
-3. Now you can open ErgoSense normally!
-
 > [!IMPORTANT] > **Help Needed: macOS Code Signing**
 >
 > We are looking for contributors who can help us with the official Apple code signing and notarization process. This requires an Apple Developer Program membership ($99/year). If you would like to sponsor this or help us get signed to remove the "damaged app" warning for everyone, please **[contact us](mailto:ergosense@sadish.com.np)** or open an issue! Your support would be a huge help to the community.
@@ -345,9 +338,9 @@ If you want to run ErgoSense locally or contribute to the project, follow these 
 
 ### Prerequisites
 
-- Node.js (v18+)
-- Python 3 (required for building native modules like `better-sqlite3`)
-- C++ Build Tools (Xcode Command Line Tools on macOS, Visual Studio Build Tools on Windows)
+- Node.js 22.12 or later (see `engines` in `package.json`)
+
+No Python or C++ build tools are required: the database uses Electron's built-in `node:sqlite`, and `onnxruntime-node` ships prebuilt binaries.
 
 ### Setup
 
@@ -364,7 +357,7 @@ If you want to run ErgoSense locally or contribute to the project, follow these 
     npm install
     ```
 
-    _Note: internal native modules will be compiled during this step._
+    _Note: no native compilation is needed; this works the same on Windows, macOS, and Linux._
 
 3.  Run the development server:
     ```bash
@@ -376,9 +369,10 @@ If you want to run ErgoSense locally or contribute to the project, follow these 
 **Windows**
 
 - **Camera Access Denied**: Check Settings → Privacy & Security → Camera and allow ErgoSense
-- **Installation Fails**: Run installer as Administrator (right-click → Run as administrator)
-- **Missing Dependencies**: Ensure .NET Framework is installed (usually automatic)
-- **Antivirus Interference**: Temporarily disable antivirus during installation if needed
+- **"Missing System Dependency" / app closes on launch**: Install the [Microsoft Visual C++ Redistributable 2015-2022 (x64)](https://aka.ms/vs/17/release/vc_redist.x64.exe) and start ErgoSense again (most common with the portable build)
+- **Camera in use**: Windows lets only one app use the webcam at a time; close Teams, Zoom, or the Camera app, then click "Try again"
+- **No notifications**: Check Settings → System → Notifications and make sure ErgoSense and Focus/Do Not Disturb allow them
+- **Window disappeared**: Closing the window keeps ErgoSense running in the system tray; click the tray icon (you may need to expand the hidden icons arrow) or launch it again from the Start menu
 
 **Linux**
 
