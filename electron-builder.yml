@@ -14,8 +14,10 @@ extraResources:
     to: icon.png
 mac:
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
   icon: build/icon.png
 
   category: public.app-category.healthcare-fitness
@@ -38,6 +40,7 @@ win:
     - "dist-electron/**/*"
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**"
     - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 
@@ -46,7 +49,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   license: LICENSE.md
   include: build/installer.nsh
-  deleteAppDataOnUninstall: true
+  # Keep posture history and settings if the user uninstalls/reinstalls.
+  deleteAppDataOnUninstall: false
 linux:
   target:
     - AppImage
@@ -59,6 +63,7 @@ linux:
     - "dist-electron/**/*"
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/arm64/**"
     - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
 publish:

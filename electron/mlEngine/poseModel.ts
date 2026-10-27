@@ -12,6 +12,10 @@ export class PoseModel {
   private session: ORT.InferenceSession | null = null;
   private inputName: string = 'input';
 
+  isLoaded(): boolean {
+    return this.session !== null;
+  }
+
   async load() {
     console.log('Attempting to load model from:', MODEL_PATH);
     try {

@@ -8,6 +8,7 @@ import * as Sentry from '@sentry/electron/main';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import { getAppIconPath } from './appIcon';
+import { runSmokeTest, SMOKE_TEST_OUTPUT } from './smokeTest';
 import {
   clampDays,
   clampTimeWindow,
@@ -245,8 +246,8 @@ const sendToWindow = (channel: string, data: unknown) => {
 };
 
 function setupAutoUpdater() {
-  // Portable builds and dev runs have no update feed.
-  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR) return;
+  // Portable builds, dev runs and CI smoke tests have no update feed.
+  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR || SMOKE_TEST_OUTPUT) return;
 
   autoUpdater.on('update-available', (info) => sendToWindow(IPC_CHANNELS.UPDATE_AVAILABLE, info));
   autoUpdater.on('update-downloaded', (info) => sendToWindow(IPC_CHANNELS.UPDATE_DOWNLOADED, info));
@@ -258,7 +259,7 @@ app.whenReady().then(() => {
   const openedAtLogin =
     process.argv.includes(HIDDEN_LAUNCH_ARG) ||
     (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin);
-  createWindow({ startHidden: openedAtLogin });
+  createWindow({ startHidden: openedAtLogin || Boolean(SMOKE_TEST_OUTPUT) });
   createTray();
   setupAutoUpdater();
 
@@ -411,4 +412,8 @@ app.whenReady().then(() => {
   breakManager.on('countdown-update', (data) => sendToWindow('break-countdown-update', data));
   breakManager.on('break-due', (data) => sendToWindow('break-due', data));
   breakManager.on('break-warning', (data) => sendToWindow('break-warning', data));
+
+  if (SMOKE_TEST_OUTPUT && win) {
+    void runSmokeTest(win, mlEngine, SMOKE_TEST_OUTPUT);
+  }
 });
