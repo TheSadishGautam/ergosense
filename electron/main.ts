@@ -8,6 +8,14 @@ import * as Sentry from '@sentry/electron/main';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import { getAppIconPath } from './appIcon';
+import {
+  clampDays,
+  clampTimeWindow,
+  clampUnit,
+  isRendererSettingKey,
+  sanitizeBreakSettings,
+  sanitizeNotificationSettings,
+} from './ipcValidation';
 
 const APP_ID = 'com.sadishgautam.ergosense';
 const HIDDEN_LAUNCH_ARG = '--hidden';
@@ -247,12 +255,6 @@ function setupAutoUpdater() {
   autoUpdater.checkForUpdates().catch((err) => log.warn('Update check failed:', err));
 }
 
-const clampTimeWindow = (value: unknown, fallback = 86_400_000): number => {
-  const MAX_WINDOW_MS = 366 * 86_400_000;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return fallback;
-  return Math.min(value, MAX_WINDOW_MS);
-};
-
 app.whenReady().then(() => {
   createWindow({ startHidden: process.argv.includes(HIDDEN_LAUNCH_ARG) });
   createTray();
@@ -299,7 +301,8 @@ app.whenReady().then(() => {
     return mlEngine.getStore().getNotificationSettings();
   });
 
-  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, settings) => {
+  safeHandle(IPC_CHANNELS.UPDATE_NOTIFICATION_SETTINGS, (event, input) => {
+    const settings = sanitizeNotificationSettings(input, mlEngine.getStore().getNotificationSettings());
     mlEngine.getStore().updateNotificationSettings(settings);
     mlEngine.getNotificationManager().updateSettings(settings);
     return { success: true };
@@ -333,11 +336,13 @@ app.whenReady().then(() => {
     };
   });
 
-  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key: string) => {
+  safeHandle(IPC_CHANNELS.GET_APP_SETTING, (event, key: unknown) => {
+    if (!isRendererSettingKey(key)) throw new Error(`Setting "${String(key)}" is not accessible from the renderer`);
     return mlEngine.getStore().getAppSetting(key);
   });
 
-  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key: string, value: any) => {
+  safeHandle(IPC_CHANNELS.SET_APP_SETTING, (event, key: unknown, value: unknown) => {
+    if (!isRendererSettingKey(key)) throw new Error(`Setting "${String(key)}" is not accessible from the renderer`);
     mlEngine.getStore().setAppSetting(key, value);
     return true;
   });
@@ -366,7 +371,7 @@ app.whenReady().then(() => {
   });
 
   safeHandle('update-break-settings', (event, settings) => {
-    breakManager.updateSettings(settings);
+    breakManager.updateSettings(sanitizeBreakSettings(settings));
     return true;
   });
 
@@ -386,12 +391,12 @@ app.whenReady().then(() => {
   });
 
   safeHandle('end-break', (event, postBreakStrain) => {
-    breakManager.endBreak(postBreakStrain);
+    breakManager.endBreak(clampUnit(postBreakStrain));
     return true;
   });
 
   safeHandle('get-break-stats', (event, days) => {
-    return mlEngine.getStore().getBreakStats(typeof days === 'number' && days > 0 ? Math.min(days, 366) : 7);
+    return mlEngine.getStore().getBreakStats(clampDays(days));
   });
 
   safeHandle('get-break-history-window', (event, timeWindowMs: number) => {
