@@ -85,7 +85,8 @@ const isTrustedSender = (event: IpcMainEvent | IpcMainInvokeEvent): boolean => {
   const senderUrl = event.senderFrame?.url || '';
   if (!senderUrl) return false;
 
-  if (app.isPackaged) {
+  // file:// URLs have an opaque origin ("null"), so match the scheme for locally loaded builds.
+  if (app.isPackaged || !process.env.VITE_DEV_SERVER_URL) {
     return senderUrl.startsWith('file://');
   }
 
@@ -157,9 +158,7 @@ function createTray() {
 function createWindow({ startHidden = false } = {}) {
   const iconPath = getAppIconPath();
 
-  if (process.platform === 'darwin') {
-    app.dock.setIcon(nativeImage.createFromPath(iconPath));
-  }
+  app.dock?.setIcon(nativeImage.createFromPath(iconPath));
 
   win = new BrowserWindow({
     width: 1200,
@@ -256,7 +255,10 @@ function setupAutoUpdater() {
 }
 
 app.whenReady().then(() => {
-  createWindow({ startHidden: process.argv.includes(HIDDEN_LAUNCH_ARG) });
+  const openedAtLogin =
+    process.argv.includes(HIDDEN_LAUNCH_ARG) ||
+    (process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin);
+  createWindow({ startHidden: openedAtLogin });
   createTray();
   setupAutoUpdater();
 
@@ -320,8 +322,7 @@ app.whenReady().then(() => {
   safeHandle(IPC_CHANNELS.SET_AUTO_START, (event, enable: boolean) => {
     app.setLoginItemSettings({
       openAtLogin: enable === true,
-      // openAsHidden is macOS-only; Windows gets a launch arg checked in whenReady.
-      openAsHidden: true,
+      // Windows: launch arg checked in whenReady. macOS: detected via wasOpenedAtLogin.
       args: [HIDDEN_LAUNCH_ARG],
     });
     return true;

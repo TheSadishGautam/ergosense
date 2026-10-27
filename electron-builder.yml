@@ -8,7 +8,6 @@ files:
 asarUnpack:
   - "**/*.node"
   - "**/node_modules/onnxruntime-node/**"
-  - "**/node_modules/better-sqlite3/**"
 extraResources:
   - resources/**
   - from: renderer/src/assets/icon.png
