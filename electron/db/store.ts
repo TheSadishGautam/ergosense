@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import { app } from 'electron';
 import { NotificationSettings, PostureBaseline } from '../../models/types';
@@ -12,12 +12,12 @@ export interface MetricRecord {
 }
 
 export class MetricStore {
-  private db: Database.Database;
+  private db: DatabaseSync;
 
   constructor() {
     const dbPath = path.join(app.getPath('userData'), 'ergosense.db');
     console.log('Initializing database at:', dbPath);
-    this.db = new Database(dbPath);
+    this.db = new DatabaseSync(dbPath);
     this.init();
   }
 
@@ -71,13 +71,13 @@ export class MetricStore {
   public getMetrics(type: string, timeWindowMs: number): MetricRecord[] {
     const since = Date.now() - timeWindowMs;
     const stmt = this.db.prepare('SELECT * FROM raw_metrics WHERE type = ? AND timestamp > ? ORDER BY timestamp ASC');
-    return stmt.all(type, since) as MetricRecord[];
+    return stmt.all(type, since) as unknown as MetricRecord[];
   }
 
   public getZoneMetrics(timeWindowMs: number): any {
     const since = Date.now() - timeWindowMs;
     const stmt = this.db.prepare('SELECT * FROM raw_metrics WHERE type = ? AND timestamp > ? ORDER BY timestamp ASC');
-    const records = stmt.all('ZONE', since) as MetricRecord[];
+    const records = stmt.all('ZONE', since) as unknown as MetricRecord[];
     
     // Aggregate zone data from all records
     const zoneAgg: Record<string, { count: number; totalPercentage: number }> = {};
@@ -111,7 +111,7 @@ export class MetricStore {
   public getMonitorMetrics(timeWindowMs: number): any {
     const since = Date.now() - timeWindowMs;
     const stmt = this.db.prepare('SELECT * FROM raw_metrics WHERE type = ? AND timestamp > ? ORDER BY timestamp ASC');
-    const records = stmt.all('MONITOR_GAZE', since) as MetricRecord[];
+    const records = stmt.all('MONITOR_GAZE', since) as unknown as MetricRecord[];
     
     if (records.length === 0) {
       return {
@@ -182,7 +182,7 @@ export class MetricStore {
   public getAllMetrics(timeWindowMs: number): MetricRecord[] {
     const since = Date.now() - timeWindowMs;
     const stmt = this.db.prepare('SELECT * FROM raw_metrics WHERE timestamp > ? ORDER BY timestamp ASC');
-    return stmt.all(since) as MetricRecord[];
+    return stmt.all(since) as unknown as MetricRecord[];
   }
 
   public pruneOldMetrics(maxAgeMs: number) {

@@ -338,9 +338,9 @@ If you want to run ErgoSense locally or contribute to the project, follow these 
 
 ### Prerequisites
 
-- Node.js 20 (see `engines` in `package.json`)
-- Python 3 (only needed if a prebuilt `better-sqlite3` binary is unavailable and it has to compile)
-- C++ Build Tools for the same fallback (Xcode Command Line Tools on macOS; Visual Studio Build Tools with the "Desktop development with C++" workload on Windows)
+- Node.js 22.12 or later (see `engines` in `package.json`)
+
+No Python or C++ build tools are required: the database uses Electron's built-in `node:sqlite`, and `onnxruntime-node` ships prebuilt binaries.
 
 ### Setup
 
@@ -357,7 +357,7 @@ If you want to run ErgoSense locally or contribute to the project, follow these 
     npm install
     ```
 
-    _Note: internal native modules will be compiled during this step._
+    _Note: no native compilation is needed; this works the same on Windows, macOS, and Linux._
 
 3.  Run the development server:
     ```bash

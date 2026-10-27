@@ -11,6 +11,10 @@ export class FaceModel {
   private session: ORT.InferenceSession | null = null;
   private inputName: string = 'input';
   
+  isLoaded(): boolean {
+    return this.session !== null;
+  }
+
   async load() {
     console.log('Attempting to load face model from:', MODEL_PATH);
     try {

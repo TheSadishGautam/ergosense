@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   quality:
@@ -22,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -37,15 +38,119 @@ jobs:
       - name: Test
         run: npm test -- --run
 
-      - name: Package smoke test (Windows)
-        if: runner.os == 'Windows'
-        run: npx tsc && npx vite build && npx electron-builder --win --dir --publish never
+  # Builds the real installers for every platform (unsigned, never published) and
+  # launches the packaged app in self-check mode (see electron/smokeTest.ts).
+  package:
+    needs: quality
+    runs-on: ${{ matrix.os }}
 
-      - name: Verify packaged resources (Windows)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      ONNXRUNTIME_NODE_INSTALL: skip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm xvfb
+
+      - name: Bundle VC++ Redistributable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile build/vc_redist.x64.exe
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installers
+        run: npm run build -- --publish never
+
+      - name: List build output
+        shell: bash
+        run: ls -la release
+
+      - name: Smoke test packaged app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ERGOSENSE_SMOKE_TEST="$RUNNER_TEMP/smoke.json" \
+            release/mac-arm64/ErgoSense.app/Contents/MacOS/ErgoSense --user-data-dir="$RUNNER_TEMP/userdata" || code=$?
+          cat "$RUNNER_TEMP/smoke.json"
+          exit ${code:-0}
+
+      - name: Smoke test packaged app (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          exe=$(find release/linux-unpacked -maxdepth 1 -type f -executable -name 'ergosense*' | head -1)
+          ERGOSENSE_SMOKE_TEST="$RUNNER_TEMP/smoke.json" \
+            xvfb-run -a "$exe" --no-sandbox --user-data-dir="$RUNNER_TEMP/userdata" || code=$?
+          cat "$RUNNER_TEMP/smoke.json"
+          exit ${code:-0}
+
+      - name: Smoke test portable exe (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $res = "release/win-unpacked/resources"
-          foreach ($f in @("icon.png", "resources/face_mesh.onnx", "resources/movenet_lightning.onnx")) {
-            if (-not (Test-Path "$res/$f")) { Write-Error "Missing $res/$f"; exit 1 }
-          }
+          $portable = Get-ChildItem release -Filter "ErgoSense *.exe" | Where-Object { $_.Name -notlike "*Setup*" } | Select-Object -First 1
+          $out = "$env:RUNNER_TEMP\smoke-portable.json"
+          $env:ERGOSENSE_SMOKE_TEST = $out
+          Start-Process -FilePath $portable.FullName -ArgumentList "--user-data-dir=$env:RUNNER_TEMP\portable-data" -Wait
+          if (-not (Test-Path $out)) { Write-Error "Portable app produced no smoke result"; exit 1 }
+          Get-Content $out
+          if (-not (Get-Content $out | ConvertFrom-Json).ok) { exit 1 }
+
+      - name: Install, smoke test and uninstall NSIS installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Filter "*Setup*.exe" | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "Installer exited with $($p.ExitCode)"; exit 1 }
+
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter "ErgoSense.exe" | Select-Object -First 1
+          if (-not $exe) { Write-Error "Installed ErgoSense.exe not found"; exit 1 }
+          Write-Host "Installed to $($exe.FullName)"
+
+          # Run against the default %APPDATA% data folder so the uninstall check below is meaningful.
+          $out = "$env:RUNNER_TEMP\smoke-installed.json"
+          $env:ERGOSENSE_SMOKE_TEST = $out
+          $run = Start-Process -FilePath $exe.FullName -Wait -PassThru
+          Get-Content $out
+          if ($run.ExitCode -ne 0) { Write-Error "Installed app smoke test failed ($($run.ExitCode))"; exit 1 }
+          Remove-Item Env:\ERGOSENSE_SMOKE_TEST
+
+          $dataDir = "$env:APPDATA\ErgoSense"
+          if (-not (Test-Path "$dataDir\ergosense.db")) { Write-Error "Database not created in $dataDir"; exit 1 }
+
+          $uninstaller = Get-ChildItem $exe.DirectoryName -Filter "Uninstall*.exe" | Select-Object -First 1
+          $u = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
+          Start-Sleep -Seconds 5  # the NSIS uninstaller re-launches itself from %TEMP%
+          if (Test-Path $exe.FullName) { Write-Error "App still present after uninstall"; exit 1 }
+          if (-not (Test-Path "$dataDir\ergosense.db")) { Write-Error "Uninstall deleted user data"; exit 1 }
+          Write-Host "Uninstall kept user data in $dataDir"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ergosense-${{ runner.os }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm

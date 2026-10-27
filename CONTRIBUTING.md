@@ -8,14 +8,10 @@ Thank you for your interest in contributing to ErgoSense! We welcome contributio
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js**: v20 (matches `engines` in `package.json`)
+- **Node.js**: v22.12 or later (matches `engines` in `package.json`)
 - **npm**: Included with Node.js
-- **Build Tools**:
-  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-  - **Windows**: Visual Studio Build Tools with the "Desktop development with C++" workload, plus Python 3 (`windows-build-tools` is deprecated and does not work on Node 20)
-  - **Linux**: `build-essential` and python3
 
-> **Note:** This project uses native modules (`better-sqlite3`, `onnxruntime-node`). Prebuilt binaries are used when available; the build tools above are only needed if a module has to compile from source.
+> **Note:** No C++ build tools or Python are needed. The database uses Electron's built-in `node:sqlite`, and `onnxruntime-node` ships prebuilt binaries for Windows, macOS, and Linux.
 
 ### Installation
 
@@ -29,7 +25,7 @@ Before you begin, ensure you have the following installed:
     ```bash
     npm install
     ```
-    _If you encounter errors during installation, it is likely due to missing build tools for native modules. Check the Prerequisites section._
+    _If installation fails, check that you are on Node.js 22.12 or later (`node -v`)._
 
 ### Running Locally
 

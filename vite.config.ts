@@ -14,7 +14,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['onnxruntime-node', 'better-sqlite3'],
+              external: ['onnxruntime-node', 'node:sqlite'],
             },
           },
         },
